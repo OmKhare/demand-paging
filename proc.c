@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "elf.h"
 
 struct {
   struct spinlock lock;
@@ -473,7 +474,6 @@ wakeup(void *chan)
   release(&ptable.lock);
 }
 
-// Kill the process with the given pid.
 // Process won't exit until it returns
 // to user space (see trap in trap.c).
 int
@@ -532,3 +532,68 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+
+//Page Fault Handler currently placed here. Verify whether this is a good position for placing it.
+void
+pgflt_handler(){
+
+  struct proc *curproc = myproc();
+  int eip = PGROUNDDOWN(curproc->tf->eip);
+  struct elfhdr elf;
+  int i, off;
+  struct proghdr ph;
+  struct inode *ip;
+
+  if((ip = namei(curproc->name)) == 0){
+    end_op();
+    cprintf("%s\n",curproc->name);
+    cprintf("Page Handler: Fail\n");
+    return ;
+  }
+
+  
+  begin_op();
+  ilock(ip);
+
+  int sz = 0;
+
+  if(readi(ip, (char*)&elf, 0, sizeof(elf)) != sizeof(elf))
+    goto bad;
+  cprintf("Done 1\n");
+  if(elf.magic != ELF_MAGIC)
+    goto bad;
+  cprintf("Done 2\n");
+  for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
+    if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
+      goto bad;
+    if(ph.type != ELF_PROG_LOAD)
+      continue;
+    if(ph.memsz < ph.filesz)
+      goto bad;
+    if(ph.vaddr + ph.memsz < ph.vaddr)
+      goto bad;
+    if((sz = allocuvm(curproc->pgdir, sz, ph.vaddr + ph.memsz)) == 0)
+      goto bad;
+    if(ph.vaddr % PGSIZE != 0)
+      goto bad;
+    if(loaduvm(curproc->pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
+      goto bad;
+  }
+
+  iunlockput(ip);
+  end_op();
+  cprintf("Value of eip : %x\n", eip);
+
+  return;
+
+  bad:
+  cprintf("In the bad :)\n");
+  if(curproc->pgdir)
+    freevm(curproc->pgdir);
+  if(ip){
+    iunlockput(ip);
+    end_op();
+  }
+}
+

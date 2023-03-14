@@ -39,23 +39,24 @@ exec(char *path, char **argv)
     goto bad;
 
   // Load program into memory.
+  //Currently generalised that the sz will be from the last second Program Header.
+  //To verify this for all the programs.
   sz = 0;
-  for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
-    if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
-      goto bad;
-    if(ph.type != ELF_PROG_LOAD)
-      continue;
-    if(ph.memsz < ph.filesz)
-      goto bad;
-    if(ph.vaddr + ph.memsz < ph.vaddr)
-      goto bad;
-    if((sz = allocuvm(pgdir, sz, ph.vaddr + ph.memsz)) == 0)
-      goto bad;
-    if(ph.vaddr % PGSIZE != 0)
-      goto bad;
-    if(loaduvm(pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
+  if (elf.phnum > 0){
+    if(readi(ip, (char*)&ph, elf.phoff + ((elf.phnum-2)*sizeof(ph)), sizeof(ph)) != sizeof(ph))
       goto bad;
   }
+
+  sz = ph.vaddr + ph.memsz;
+
+  //This commented code is for debugging.
+
+  // for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
+  //   if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
+  //     goto bad;
+  //   cprintf("vaddr - %d | memsz - %d | filsize - %d\n", ph.vaddr, ph.memsz, ph.filesz);
+  // }
+
   iunlockput(ip);
   end_op();
   ip = 0;
@@ -87,11 +88,8 @@ exec(char *path, char **argv)
   if(copyout(pgdir, sp, ustack, (3+argc+1)*4) < 0)
     goto bad;
 
-  // Save program name for debugging.
-  for(last=s=path; *s; s++)
-    if(*s == '/')
-      last = s+1;
-  safestrcpy(curproc->name, last, sizeof(curproc->name));
+  //Currently for Debugging Purpose : Storing Path of Process as Name.
+  safestrcpy(curproc->name, path, strlen(path)+1);
 
   // Commit to the user image.
   oldpgdir = curproc->pgdir;

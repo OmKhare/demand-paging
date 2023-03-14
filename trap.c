@@ -47,6 +47,14 @@ trap(struct trapframe *tf)
   }
 
   switch(tf->trapno){
+
+  //Add a check here to detect whether the page fault has occured or the system actually has a illegal memory access.
+  case T_PGFLT:
+    cprintf("Page Fault Occoured! | PID - %d | eip - %d | eip in context - %x\n", myproc()->pid, myproc()->tf->eip, V2P(myproc()->context->eip));
+    pgflt_handler();
+    lapiceoi();
+    break;
+
   case T_IRQ0 + IRQ_TIMER:
     if(cpuid() == 0){
       acquire(&tickslock);
