@@ -16,6 +16,9 @@ struct buf*     bread(uint, uint);
 void            brelse(struct buf*);
 void            bwrite(struct buf*);
 
+//vm.c
+int     mappages(pde_t*, void *, uint, uint, int, int);
+
 // console.c
 void            consoleinit(void);
 void            cprintf(char*, ...);

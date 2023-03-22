@@ -59,8 +59,10 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
-    // if(loaduvm(curproc->pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
-    //   goto bad;
+    curproc->prog_head_info[i].vaddr = ph.vaddr;
+    curproc->prog_head_info[i].sz = ph.filesz;
+    curproc->prog_head_info[i].offset = ph.off;
+    curproc->prog_head_info[i].ip = ip;
   }
 
   iunlockput(ip);

@@ -57,8 +57,8 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
 // Create PTEs for virtual addresses starting at va that refer to
 // physical addresses starting at pa. va and size might not
 // be page-aligned.
-static int
-mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
+int
+mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm, int set_pte)
 {
   char *a, *last;
   pte_t *pte;
@@ -70,32 +70,13 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
       return -1;
     if(*pte & PTE_P)
       panic("remap");
-    *pte = pa | perm | PTE_P;
+    *pte = pa | perm | set_pte;
     if(a == last)
       break;
     a += PGSIZE;
     pa += PGSIZE;
   }
   return 0;
-}
-
-// This function is used for allocating pages but not setting the pte bit
-static int
-mappages_nopte_p(pde_t *pgdir, uint a, uint newsz)
-{
-  pte_t *pte;
-
-  for(;;){
-    if((pte = walkpgdir(pgdir, (char*)a, 1)) == 0)
-      return -1;
-    if(*pte & PTE_P)
-      panic("remap_nopte_p");
-    *pte = PTE_U | PTE_W;
-    a += PGSIZE;
-    if(a >= newsz)
-      break;
-  }
-  return newsz;
 }
 
 // There is one page table per process, plus one that's used when
@@ -147,7 +128,7 @@ setupkvm(void)
     panic("PHYSTOP too high");
   for(k = kmap; k < &kmap[NELEM(kmap)]; k++)
     if(mappages(pgdir, k->virt, k->phys_end - k->phys_start,
-                (uint)k->phys_start, k->perm) < 0) {
+                (uint)k->phys_start, k->perm, 1) < 0) {
       freevm(pgdir);
       return 0;
     }
@@ -207,7 +188,7 @@ inituvm(pde_t *pgdir, char *init, uint sz)
     panic("inituvm: more than a page");
   mem = kalloc();
   memset(mem, 0, PGSIZE);
-  mappages(pgdir, 0, PGSIZE, V2P(mem), PTE_W|PTE_U);
+  mappages(pgdir, 0, PGSIZE, V2P(mem), PTE_W|PTE_U, 0);
   memmove(mem, init, sz);
 }
 
@@ -249,9 +230,6 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz, uint setpte)
     return oldsz;
 
   a = PGROUNDUP(oldsz);
-  if(setpte){
-    return mappages_nopte_p(pgdir, a, newsz);
-  }
   for(; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
@@ -260,7 +238,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz, uint setpte)
       return 0;
     }
     memset(mem, 0, PGSIZE);
-    if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U) < 0){
+    if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U, 0) < 0){
       cprintf("allocuvm out of memory (2)\n");
       deallocuvm(pgdir, newsz, oldsz);
       kfree(mem);
@@ -354,7 +332,7 @@ copyuvm(pde_t *pgdir, uint sz)
     if((mem = kalloc()) == 0)
       goto bad;
     memmove(mem, (char*)P2V(pa), PGSIZE);
-    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0) {
+    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags, 0) < 0) {
       kfree(mem);
       goto bad;
     }
