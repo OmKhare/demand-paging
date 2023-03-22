@@ -79,6 +79,25 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
   return 0;
 }
 
+// This function is used for allocating pages but not setting the pte bit
+static int
+mappages_nopte_p(pde_t *pgdir, uint a, uint newsz)
+{
+  pte_t *pte;
+
+  for(;;){
+    if((pte = walkpgdir(pgdir, (char*)a, 1)) == 0)
+      return -1;
+    if(*pte & PTE_P)
+      panic("remap_nopte_p");
+    *pte = PTE_U | PTE_W;
+    a += PGSIZE;
+    if(a >= newsz)
+      break;
+  }
+  return newsz;
+}
+
 // There is one page table per process, plus one that's used when
 // a CPU is not running any process (kpgdir). The kernel uses the
 // current process's page table during system calls and interrupts;
@@ -219,7 +238,7 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
 // Allocate page tables and physical memory to grow process from oldsz to
 // newsz, which need not be page aligned.  Returns new size or 0 on error.
 int
-allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
+allocuvm(pde_t *pgdir, uint oldsz, uint newsz, uint setpte)
 {
   char *mem;
   uint a;
@@ -230,6 +249,9 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
     return oldsz;
 
   a = PGROUNDUP(oldsz);
+  if(setpte){
+    return mappages_nopte_p(pgdir, a, newsz);
+  }
   for(; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){

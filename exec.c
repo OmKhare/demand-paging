@@ -10,7 +10,7 @@
 int
 exec(char *path, char **argv)
 {
-  uint argc, sz, sp, ustack[3+MAXARG+1];
+  uint argc, sz, sp, ustack[3+MAXARG+1], i, off;
   struct elfhdr elf;
   struct inode *ip;
   struct proghdr ph;
@@ -39,21 +39,29 @@ exec(char *path, char **argv)
   // Load program into memory.
   //Currently generalised that the sz will be from the last second Program Header.
   //To verify this for all the programs.
+
   sz = 0;
-  if (elf.phnum > 0){
-    if(readi(ip, (char*)&ph, elf.phoff + ((elf.phnum-2)*sizeof(ph)), sizeof(ph)) != sizeof(ph))
+
+  if(readi(ip, (char*)&elf, 0, sizeof(elf)) != sizeof(elf))
+    goto bad;
+  if(elf.magic != ELF_MAGIC)
+    goto bad;
+  for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
+    if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
       goto bad;
+    if(ph.type != ELF_PROG_LOAD)
+      continue;
+    if(ph.memsz < ph.filesz)
+      goto bad;
+    if(ph.vaddr + ph.memsz < ph.vaddr)
+      goto bad;
+    if((sz = allocuvm(curproc->pgdir, sz, ph.vaddr + ph.memsz, 0)) == 0)
+      goto bad;
+    if(ph.vaddr % PGSIZE != 0)
+      goto bad;
+    // if(loaduvm(curproc->pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
+    //   goto bad;
   }
-
-  sz = ph.vaddr + ph.memsz;
-
-  //This commented code is for debugging.
-
-  // for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
-  //   if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
-  //     goto bad;
-  //   cprintf("vaddr - %d | memsz - %d | filsize - %d\n", ph.vaddr, ph.memsz, ph.filesz);
-  // }
 
   iunlockput(ip);
   end_op();
@@ -62,7 +70,7 @@ exec(char *path, char **argv)
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
   sz = PGROUNDUP(sz);
-  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
+  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE, 1)) == 0)
     goto bad;
   clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
   sp = sz;
