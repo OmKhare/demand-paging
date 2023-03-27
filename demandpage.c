@@ -9,36 +9,58 @@
 #include "elf.h"
 #include "demandpage.h"
 
-void
-pgflt_handler()
+#ifndef min
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+#endif
+
+void pgflt_handler()
 {
-    struct proc* curproc = myproc();
-    cprintf("Page Fault: Kernel Panic\n");
+    struct proc *curproc = myproc();
+    uint pgflt_addr = PGROUNDDOWN(rcr2());
     cprintf("rcr2 value : %d\n", rcr2());
-    if (rcr2() > curproc->sz)
+    begin_op();
+    if (pgflt_addr > curproc->sz)
     {
-        panic("Illegal Memory Access!");
+        cprintf("Illegal Memory Access\n");
+        goto bad;
     }
     else
     {
-        char* mem = kalloc();
+        char *mem = kalloc();
         if (mem == 0)
         {
-            panic("Kalloc out of Free Pages!");
+            cprintf("Cannot Allocate Pages!\n");
+            goto bad;
         }
         else
         {
-            cprintf("Page Fault Actually Woorking!");
             memset(mem, 0, PGSIZE);
-            mappages(curproc->pgdir, (void *)rcr2(), PGSIZE, V2P(mem), PTE_U| PTE_W, 1);
-            for (int i = 0 ; i < 2 ; i++)
+            if (mappages(curproc->pgdir, (char *)pgflt_addr, PGSIZE, V2P(mem), PTE_U | PTE_W, 1) < 0)
             {
-                if (rcr2() >= curproc->prog_head_info[i].vaddr && rcr2() < curproc->prog_head_info[i].vaddr + curproc->prog_head_info[i].sz)
+                cprintf("Cannot Map Pages!\n");
+                goto bad;
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                if (pgflt_addr >= curproc->prog_head_info[i].vaddr && pgflt_addr < curproc->prog_head_info[i].vaddr + curproc->prog_head_info[i].memsz)
                 {
-                    loaduvm(curproc->pgdir, (char *)curproc->prog_head_info[i].vaddr, curproc->prog_head_info->ip, curproc->prog_head_info->offset ,curproc->prog_head_info->sz);
+                    while (pgflt_addr > curproc->prog_head_info[i].vaddr)
+                    {
+                        curproc->prog_head_info[i].vaddr += PGSIZE;
+                        curproc->prog_head_info[i].offset += PGSIZE;
+                        curproc->prog_head_info[i].filesz -= PGSIZE;
+                    }
+                    if (loaduvm(curproc->pgdir, (void *)pgflt_addr, curproc->prog_head_info->ip, curproc->prog_head_info->offset, min(PGSIZE, curproc->prog_head_info->filesz)) < 0)
+                    {
+                        cprintf("loaduvm failed!\n");
+                        goto bad;
+                    }
+                    break;
                 }
             }
         }
     }
-
+bad:
+    end_op();
+    return;
 }

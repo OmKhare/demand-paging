@@ -188,7 +188,7 @@ inituvm(pde_t *pgdir, char *init, uint sz)
     panic("inituvm: more than a page");
   mem = kalloc();
   memset(mem, 0, PGSIZE);
-  mappages(pgdir, 0, PGSIZE, V2P(mem), PTE_W|PTE_U, 0);
+  mappages(pgdir, 0, PGSIZE, V2P(mem), PTE_W|PTE_U, 1);
   memmove(mem, init, sz);
 }
 
@@ -238,7 +238,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz, uint setpte)
       return 0;
     }
     memset(mem, 0, PGSIZE);
-    if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U, 0) < 0){
+    if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U, 1) < 0){
       cprintf("allocuvm out of memory (2)\n");
       deallocuvm(pgdir, newsz, oldsz);
       kfree(mem);

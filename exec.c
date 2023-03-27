@@ -55,14 +55,14 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr + ph.memsz < ph.vaddr)
       goto bad;
-    if((sz = allocuvm(curproc->pgdir, sz, ph.vaddr + ph.memsz, 0)) == 0)
-      goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
     curproc->prog_head_info[i].vaddr = ph.vaddr;
-    curproc->prog_head_info[i].sz = ph.filesz;
+    curproc->prog_head_info[i].filesz = ph.filesz;
     curproc->prog_head_info[i].offset = ph.off;
     curproc->prog_head_info[i].ip = ip;
+    curproc->prog_head_info[i].memsz = ph.memsz;
+    sz = ph.vaddr + ph.memsz;
   }
 
   iunlockput(ip);

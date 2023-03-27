@@ -39,7 +39,8 @@ struct ph_info {
   uint vaddr;
   struct inode *ip;
   uint offset;
-  uint sz;
+  uint memsz;
+  uint filesz;
 };
 
 // Per-process state
