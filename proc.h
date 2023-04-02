@@ -34,15 +34,6 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
-// Struct for storing information about program header of elf
-struct ph_info {
-  uint vaddr;
-  struct inode *ip;
-  uint offset;
-  uint memsz;
-  uint filesz;
-};
-
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)
@@ -57,8 +48,9 @@ struct proc {
   int killed;                  // If non-zero, have been killed
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
-  char name[512];              // Process name (Increased the size of array for Debugging)
-  struct ph_info prog_head_info[2]; // Used to map code and data
+  char name[16];               // Process name
+  char path[512];              // Path of the current Process.
+  uint cdb_size;               // Size of the program after only loading the Code+Data+bss
 };
 
 // Process memory is laid out contiguously, low addresses first:

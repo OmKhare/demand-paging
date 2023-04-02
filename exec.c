@@ -16,6 +16,7 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
+  char *s, *last;
 
   begin_op();
 
@@ -41,11 +42,7 @@ exec(char *path, char **argv)
   //To verify this for all the programs.
 
   sz = 0;
-
-  if(readi(ip, (char*)&elf, 0, sizeof(elf)) != sizeof(elf))
-    goto bad;
-  if(elf.magic != ELF_MAGIC)
-    goto bad;
+  
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
       goto bad;
@@ -57,13 +54,11 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
-    curproc->prog_head_info[i].vaddr = ph.vaddr;
-    curproc->prog_head_info[i].filesz = ph.filesz;
-    curproc->prog_head_info[i].offset = ph.off;
-    curproc->prog_head_info[i].ip = ip;
-    curproc->prog_head_info[i].memsz = ph.memsz;
-    sz = ph.vaddr + ph.memsz;
+    if ((sz = allocuvm(pgdir, sz, ph.vaddr + ph.memsz, 0)) == 0)
+      goto bad;
   }
+
+  curproc->cdb_size = sz;
 
   iunlockput(ip);
   end_op();
@@ -96,8 +91,13 @@ exec(char *path, char **argv)
   if(copyout(pgdir, sp, ustack, (3+argc+1)*4) < 0)
     goto bad;
 
-  //Currently for Debugging Purpose : Storing Path of Process as Name.
-  safestrcpy(curproc->name, path, strlen(path)+1);
+  //Adding Path as well as Name.
+  for (last=s=path; *s; s++)
+    if (*s == '/')
+      last=s+1;
+  safestrcpy(curproc->name, last, sizeof(curproc->path));
+
+  safestrcpy(curproc->path, path, strlen(path)+1);
 
   // Commit to the user image.
   oldpgdir = curproc->pgdir;

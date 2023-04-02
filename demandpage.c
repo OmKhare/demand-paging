@@ -15,52 +15,66 @@
 
 void pgflt_handler()
 {
+
     struct proc *curproc = myproc();
+    struct elfhdr elf;
+    struct inode *ip;
+    struct proghdr ph;
+    uint i, off;
+    char* mem;
     uint pgflt_addr = PGROUNDDOWN(rcr2());
     cprintf("rcr2 value : %d\n", rcr2());
     begin_op();
-    if (pgflt_addr > curproc->sz)
+    if (pgflt_addr > KERNBASE)
     {
-        cprintf("Illegal Memory Access\n");
-        goto bad;
+        panic("Over the KERNBASE!");
     }
     else
     {
-        char *mem = kalloc();
-        if (mem == 0)
+        /*
+            Changes to be done : Handle all the panics made in an elegent way to make the system pass all the user tests.
+        */ 
+        mem = kalloc();
+        if (mappages(curproc->pgdir, (char*)pgflt_addr, PGSIZE, V2P(mem), PTE_W | PTE_U | PTE_P, 1) < 0)
+            panic("Error in Mappages");
+        if ((ip = namei(curproc->path)) == 0)
+            panic("namei error");
+        ilock(ip);
+        if (readi(ip, (char *)&elf, 0, sizeof(elf)) != sizeof(elf))
+            panic("readi error");
+        if (elf.magic != ELF_MAGIC)
+            panic("elf magic error");
+        for (i = 0, off = elf.phoff; i < elf.phnum; i++, off += sizeof(ph))
         {
-            cprintf("Cannot Allocate Pages!\n");
-            goto bad;
-        }
-        else
-        {
-            memset(mem, 0, PGSIZE);
-            if (mappages(curproc->pgdir, (char *)pgflt_addr, PGSIZE, V2P(mem), PTE_U | PTE_W, 1) < 0)
+            if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
+                panic("readi error");
+            if (ph.vaddr <= pgflt_addr && pgflt_addr <= ph.vaddr + ph.memsz)
             {
-                cprintf("Cannot Map Pages!\n");
-                goto bad;
-            }
-            for (int i = 0; i < 2; i++)
-            {
-                if (pgflt_addr >= curproc->prog_head_info[i].vaddr && pgflt_addr < curproc->prog_head_info[i].vaddr + curproc->prog_head_info[i].memsz)
+                //Entire section of the code only present
+                if (ph.vaddr + ph.filesz >= pgflt_addr + PGSIZE)
+                    loaduvm(curproc->pgdir, (char *)(ph.vaddr + pgflt_addr), ip, ph.off + pgflt_addr, PGSIZE);
+                else
                 {
-                    while (pgflt_addr > curproc->prog_head_info[i].vaddr)
+                    //Two cases possible.
+                    //If the section is for bss section completly.
+                    if (pgflt_addr >= ph.filesz)
                     {
-                        curproc->prog_head_info[i].vaddr += PGSIZE;
-                        curproc->prog_head_info[i].offset += PGSIZE;
-                        curproc->prog_head_info[i].filesz -= PGSIZE;
+                        if (pgflt_addr + PGSIZE <= ph.memsz)
+                            stosb(mem, 0, PGSIZE);
+                        else
+                            stosb(mem, 0, ph.memsz - pgflt_addr);
                     }
-                    if (loaduvm(curproc->pgdir, (void *)pgflt_addr, curproc->prog_head_info->ip, curproc->prog_head_info->offset, min(PGSIZE, curproc->prog_head_info->filesz)) < 0)
-                    {
-                        cprintf("loaduvm failed!\n");
-                        goto bad;
+                    else
+                    //If the section overlaps bss as well as code+data
+                    {   
+                        loaduvm(curproc->pgdir, (char *)(ph.vaddr + pgflt_addr), ip, ph.off + pgflt_addr, ph.filesz - pgflt_addr);
+                        stosb(mem + (ph.filesz - pgflt_addr), 0, PGSIZE- ( ph.filesz - pgflt_addr));
                     }
-                    break;
                 }
             }
+
         }
+        iunlockput(ip);
+        end_op();
     }
-bad:
-    end_op();
-    return;
 }
