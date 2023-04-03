@@ -34,7 +34,10 @@ void pgflt_handler()
         /*
             Changes to be done : Handle all the panics made in an elegent way to make the system pass all the user tests.
         */ 
-        mem = kalloc();
+        if ((mem = kalloc()) == 0)
+        {
+            panic("No Free Page");
+        }
         if (mappages(curproc->pgdir, (char*)pgflt_addr, PGSIZE, V2P(mem), PTE_W | PTE_U | PTE_P, 1) < 0)
             panic("Error in Mappages");
         if ((ip = namei(curproc->path)) == 0)
@@ -69,6 +72,7 @@ void pgflt_handler()
                     {   
                         loaduvm(curproc->pgdir, (char *)(ph.vaddr + pgflt_addr), ip, ph.off + pgflt_addr, ph.filesz - pgflt_addr);
                         stosb(mem + (ph.filesz - pgflt_addr), 0, PGSIZE- ( ph.filesz - pgflt_addr));
+                        ip = namei(curproc->path);
                     }
                 }
             }

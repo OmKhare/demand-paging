@@ -38,6 +38,8 @@ int insert_lru(struct proc *p, int vaddr)
         lru.lru_frame_list[index].pid = p->pid;
         lru.lru_frame_list[index].vaddr = vaddr;
         lru.lru_frame_list[index].next = lru.lru_frame_list[index].prev = &(lru.lru_frame_list[index]);
+        lru.lru_frame_list[index].device = -1;
+        lru.lru_frame_list[index].block = -1;
         lru.head = &(lru.lru_frame_list[index]);
         bitmap.frame_bitmap[index] = 1;
         return 0;
@@ -51,6 +53,8 @@ int insert_lru(struct proc *p, int vaddr)
     lru.lru_frame_list[index].pid = p->pid;
     lru.lru_frame_list[index].vaddr = vaddr;
     lru.lru_frame_list[index].next = lru.head;
+    lru.lru_frame_list[index].device = -1;
+    lru.lru_frame_list[index].block = -1;
     lru.head->prev = &(lru.lru_frame_list[index]);
     lru.lru_frame_list[index].prev = last;
     last->next = &(lru.lru_frame_list[index]);

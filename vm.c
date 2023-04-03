@@ -221,7 +221,7 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
 int
 allocuvm(pde_t *pgdir, uint oldsz, uint newsz, uint setpte)
 {
-  char *mem;
+  char *mem = (char *)V2P(0);
   uint a;
 
   if(newsz >= KERNBASE)
@@ -231,17 +231,12 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz, uint setpte)
 
   a = PGROUNDUP(oldsz);
   for(; a < newsz; a += PGSIZE){
-    mem = kalloc();
-    if(mem == 0){
-      cprintf("allocuvm out of memory\n");
-      deallocuvm(pgdir, newsz, oldsz);
-      return 0;
-    }
     memset(mem, 0, PGSIZE);
+    if (setpte == 1){
+      mem = kalloc();
+    }
     if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U, setpte) < 0){
       cprintf("allocuvm out of memory (2)\n");
-      deallocuvm(pgdir, newsz, oldsz);
-      kfree(mem);
       return 0;
     }
   }
@@ -313,30 +308,40 @@ clearpteu(pde_t *pgdir, char *uva)
 // Given a parent process's page table, create a copy
 // of it for a child.
 pde_t*
-copyuvm(pde_t *pgdir, uint sz)
+copyuvm(struct proc* old)
 {
   pde_t *d;
   pte_t *pte;
-  uint pa, i, flags, ptep = 1;
-  char *mem;
+  uint pa = 0, i, flags = 0, avl = 0;
+  char *mem = 0;
 
   if((d = setupkvm()) == 0)
     return 0;
-  for(i = 0; i < sz; i += PGSIZE){
-    if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
+  for(i = 0; i < old->sz; i += PGSIZE){
+    if((mem = kalloc()) == 0)
+        goto bad;
+    if((pte = walkpgdir(old->pgdir, (void *) i, 0)) == 0)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
-      ptep = 0;
-    pa = PTE_ADDR(*pte);
-    flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto bad;
-    memmove(mem, (char*)P2V(pa), PGSIZE);
-    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags, ptep) < 0) {
-      kfree(mem);
-      goto bad;
+    {
+      if(mappages(d, (void*)i, PGSIZE, V2P(mem), PTE_W | PTE_U, 0) < 0)
+      {
+        kfree(mem);
+        goto bad;
+      }
     }
-    ptep = 1;
+    else
+    {
+      pa = PTE_ADDR(*pte);
+      flags = PTE_FLAGS(*pte);
+      avl = PTE_AVL(*pte);
+      memmove(mem, (char*)P2V(pa), PGSIZE);
+      if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags, avl) < 0) 
+      {
+        kfree(mem);
+        goto bad;
+      }
+    }
   }
   return d;
 

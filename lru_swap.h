@@ -16,17 +16,11 @@ all the pages being swapped out of the system.
 struct frame{
     int pid;
     int vaddr;
-    struct frame* next;
-    struct frame* prev;
-};
-
-struct disk_frame{
-    int vaddr;
     int block;
     int device;
     struct frame* next;
+    struct frame* prev;
 };
-
 
 struct{
     int frame_bitmap[MAX_FRAME_LRU_SWAP];
