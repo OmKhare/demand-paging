@@ -13,6 +13,7 @@ struct superblock;
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
+struct buf*     bget(uint , uint);
 void            brelse(struct buf*);
 void            bwrite(struct buf*);
 
@@ -24,6 +25,9 @@ void            consoleinit(void);
 void            cprintf(char*, ...);
 void            consoleintr(int(*)(void));
 void            panic(char*) __attribute__((noreturn));
+
+//demandpage.c
+void            pgflt_handler(void);
 
 // exec.c
 int             exec(char*, char**);
@@ -90,6 +94,17 @@ void            log_write(struct buf*);
 void            begin_op();
 void            end_op();
 
+// lru_swap.c
+void            init_lru_swap();
+int             insert_lru(int pid, int vaddr);
+int             delete_lru();
+void            delete_lru_frame(int index);
+void            free_lru(int pid);
+int             swap_out(struct proc* p, int vaddr);
+int             swap_in(struct proc* p, int vaddr);
+int             swap_check(struct proc* p, int vaddr);
+void            free_swap(int pid);
+
 // mp.c
 extern int      ismp;
 void            mpinit(void);
@@ -123,7 +138,7 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-void            pgflt_handler(void);
+struct proc* get_proc(int);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -187,6 +202,7 @@ int             loaduvm(pde_t*, char*, struct inode*, uint, uint);
 pde_t*          copyuvm(struct proc*);
 void            switchuvm(struct proc*);
 void            switchkvm(void);
+pte_t*          walkpgdir(pde_t *, const void *, int);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
 

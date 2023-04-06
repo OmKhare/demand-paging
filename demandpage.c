@@ -7,7 +7,6 @@
 #include "proc.h"
 #include "spinlock.h"
 #include "elf.h"
-#include "demandpage.h"
 
 #ifndef min
 #define min(a, b) (((a) < (b)) ? (a) : (b))
@@ -24,7 +23,6 @@ void pgflt_handler()
     char* mem;
     uint pgflt_addr = PGROUNDDOWN(rcr2());
     cprintf("rcr2 value : %d\n", rcr2());
-    begin_op();
     if (pgflt_addr > KERNBASE)
     {
         panic("Over the KERNBASE!");
@@ -79,6 +77,7 @@ void pgflt_handler()
 
         }
         iunlockput(ip);
-        end_op();
+        if (insert_lru(curproc->pid, pgflt_addr) < 0)
+            panic("Insufficient Space in lru cache!");
     }
 }

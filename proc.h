@@ -51,6 +51,8 @@ struct proc {
   char name[16];               // Process name
   char path[512];              // Path of the current Process.
   uint cdb_size;               // Size of the program after only loading the Code+Data+bss
+  struct disk_frame* swap_list;
+  char buffer[PGSIZE];
 };
 
 // Process memory is laid out contiguously, low addresses first:

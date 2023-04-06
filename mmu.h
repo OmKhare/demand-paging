@@ -102,7 +102,6 @@ struct segdesc {
 #define PTE_AVL(pte)    ((uint)(pte) &  0xE00)
 
 #ifndef __ASSEMBLER__
-typedef uint pte_t;
 
 // Task state segment format
 struct taskstate {

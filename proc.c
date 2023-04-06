@@ -131,6 +131,7 @@ userinit(void)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
   p->sz = PGSIZE;
+  p->swap_list = 0;
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -208,6 +209,7 @@ fork(void)
     if(curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
   np->cwd = idup(curproc->cwd);
+  np->swap_list = 0;
 
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
@@ -531,4 +533,17 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+struct proc* get_proc(int pid)
+{
+  int i;
+  for (i = 0 ; i < NPROC ; i++)
+  {
+    if (ptable.proc[i].pid == pid)
+    {
+      return &(ptable.proc[i]);
+    }
+  }
+  return 0;
 }
