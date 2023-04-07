@@ -7,7 +7,8 @@ all the pages being swapped out of the system.
 #ifndef LRU_SWAP_H_
 #define LRU_SWAP_H_
 
-#define MAX_FRAME_LRU_SWAP 2560 //So total 20480 blocks in memory and 2560 pages can be present in LRU
+// #define MAX_FRAME_LRU_SWAP 2560 //So total 20480 blocks in memory and 2560 pages can be present in LRU
+#define MAX_FRAME_LRU_SWAP 10
 //2560 Number can be managed as per the actual pages present in the system.
 
 
@@ -21,6 +22,7 @@ all the pages being swapped out of the system.
 struct frame{
     int pid;
     int vaddr;
+    int index;
     struct frame* next;
     struct frame* prev;
 };
@@ -28,6 +30,7 @@ struct frame{
 struct disk_frame{
     int pid;
     int vaddr;
+    int index;
     struct disk_frame* next;
 };
 

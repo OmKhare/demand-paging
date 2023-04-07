@@ -32,7 +32,27 @@ void pgflt_handler()
         /*
             Changes to be done : Handle all the panics made in an elegent way to make the system pass all the user tests.
         */ 
-        if ((mem = kalloc()) == 0)
+
+        /*
+            Get a LRU struct.
+            If not swap out till you have an empty struct. A function calling swap_out to be implemented.
+            If got, then page present for sure.
+
+            Check if present in the swap.
+            if yes, get it from the swap. A function calling swap_in. Think about the cases to be checked.
+            If not, ue the for loop below to get the page from the ELF.
+
+            Stack and Heap to be thought off afterwards.
+        */
+        get_lru(curproc->pid, pgflt_addr);
+        if (swap_check(curproc, pgflt_addr) == 0)
+        {
+            //Handle the reading from the swap and returning here.
+            swap_in(curproc, pgflt_addr);
+            return;
+        }
+
+        if ((mem = kalloc_lru_swap(curproc)) == 0)
         {
             panic("No Free Page");
         }
@@ -74,10 +94,7 @@ void pgflt_handler()
                     }
                 }
             }
-
         }
         iunlockput(ip);
-        if (insert_lru(curproc->pid, pgflt_addr) < 0)
-            panic("Insufficient Space in lru cache!");
     }
 }

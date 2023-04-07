@@ -192,7 +192,7 @@ fork(void)
   }
 
   // Copy process state from proc.
-  if((np->pgdir = copyuvm(curproc)) == 0){
+  if((np->pgdir = copyuvm(curproc, np)) == 0){
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
@@ -292,6 +292,8 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
+        free_lru(p->pid);
+        free_swap(p->pid);
         freevm(p->pgdir);
         p->pid = 0;
         p->parent = 0;
@@ -373,8 +375,8 @@ sched(void)
 
   if(!holding(&ptable.lock))
     panic("sched ptable.lock");
-  if(mycpu()->ncli != 1)
-    panic("sched locks");
+  // if(mycpu()->ncli != 1)
+  //   panic("sched locks");
   if(p->state == RUNNING)
     panic("sched running");
   if(readeflags()&FL_IF)

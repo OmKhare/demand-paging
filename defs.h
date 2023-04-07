@@ -72,7 +72,9 @@ void            ioapicinit(void);
 
 // kalloc.c
 char*           kalloc(void);
+char*           kalloc_lru_swap(struct proc*);
 void            kfree(char*);
+void            kfree_lru_swap(struct proc*, char *);
 void            kinit1(void*, void*);
 void            kinit2(void*, void*);
 
@@ -97,13 +99,19 @@ void            end_op();
 // lru_swap.c
 void            init_lru_swap();
 int             insert_lru(int pid, int vaddr);
-int             delete_lru();
-void            delete_lru_frame(int index);
+int             delete_lru(); // This function sets the bit in the function to 0 so that the data in it stays.
+void            delete_lru_frame(int index); // After getting the necessary data from the struct frame, the index in the bitmap is set to -1.
+void            free_lru_frame(struct proc* p, int vaddr);
 void            free_lru(int pid);
+int             get_pid_lru_frame(int index);
+int             get_vaddr_lru_frame(int index);
 int             swap_out(struct proc* p, int vaddr);
 int             swap_in(struct proc* p, int vaddr);
 int             swap_check(struct proc* p, int vaddr);
 void            free_swap(int pid);
+// NOW THE INTEGRATED FUNCTIONS
+void            get_lru(int, int);
+
 
 // mp.c
 extern int      ismp;
@@ -199,7 +207,7 @@ int             deallocuvm(pde_t*, uint, uint);
 void            freevm(pde_t*);
 void            inituvm(pde_t*, char*, uint);
 int             loaduvm(pde_t*, char*, struct inode*, uint, uint);
-pde_t*          copyuvm(struct proc*);
+pde_t*          copyuvm(struct proc*, struct proc*);
 void            switchuvm(struct proc*);
 void            switchkvm(void);
 pte_t*          walkpgdir(pde_t *, const void *, int);

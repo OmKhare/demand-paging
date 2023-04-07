@@ -223,6 +223,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz, uint setpte)
 {
   char *mem = (char *)V2P(0);
   uint a;
+  struct proc* p = myproc();
 
   if(newsz >= KERNBASE)
     return 0;
@@ -231,9 +232,9 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz, uint setpte)
 
   a = PGROUNDUP(oldsz);
   for(; a < newsz; a += PGSIZE){
-    memset(mem, 0, PGSIZE);
     if (setpte == 1){
-      mem = kalloc();
+      mem = kalloc_lru_swap(p);
+      memset(mem, 0, PGSIZE);
     }
     if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U, setpte) < 0){
       cprintf("allocuvm out of memory (2)\n");
@@ -308,7 +309,7 @@ clearpteu(pde_t *pgdir, char *uva)
 // Given a parent process's page table, create a copy
 // of it for a child.
 pde_t*
-copyuvm(struct proc* old)
+copyuvm(struct proc* old, struct proc* new)
 {
   pde_t *d;
   pte_t *pte;
@@ -318,27 +319,26 @@ copyuvm(struct proc* old)
   if((d = setupkvm()) == 0)
     return 0;
   for(i = 0; i < old->sz; i += PGSIZE){
-    if((mem = kalloc()) == 0)
-        goto bad;
     if((pte = walkpgdir(old->pgdir, (void *) i, 0)) == 0)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
     {
       if(mappages(d, (void*)i, PGSIZE, V2P(mem), PTE_W | PTE_U, 0) < 0)
       {
-        kfree(mem);
         goto bad;
       }
     }
     else
     {
+      if((mem = kalloc_lru_swap(new)) == 0)
+        goto bad;
       pa = PTE_ADDR(*pte);
       flags = PTE_FLAGS(*pte);
       avl = PTE_AVL(*pte);
       memmove(mem, (char*)P2V(pa), PGSIZE);
       if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags, avl) < 0) 
       {
-        kfree(mem);
+        kfree_lru_swap(new, mem);
         goto bad;
       }
     }
@@ -346,6 +346,8 @@ copyuvm(struct proc* old)
   return d;
 
 bad:
+  free_lru(new->pid);
+  free_swap(new->pid);
   freevm(d);
   return 0;
 }

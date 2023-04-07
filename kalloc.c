@@ -7,6 +7,7 @@
 #include "param.h"
 #include "memlayout.h"
 #include "mmu.h"
+#include "proc.h"
 #include "spinlock.h"
 
 void freerange(void *vstart, void *vend);
@@ -76,6 +77,27 @@ kfree(char *v)
     release(&kmem.lock);
 }
 
+void
+kfree_lru_swap(struct proc* p, char *v)
+{
+  struct run *r;
+
+  if((uint)v % PGSIZE || v < end || V2P(v) >= PHYSTOP)
+    panic("kfree");
+
+  // Fill with junk to catch dangling refs.
+  memset(v, 1, PGSIZE);
+
+  if(kmem.use_lock)
+    acquire(&kmem.lock);
+  r = (struct run*)v;
+  r->next = kmem.freelist;
+  kmem.freelist = r;
+  free_lru_frame(p, (int)v);
+  if(kmem.use_lock)
+    release(&kmem.lock);
+}
+
 // Allocate one 4096-byte page of physical memory.
 // Returns a pointer that the kernel can use.
 // Returns 0 if the memory cannot be allocated.
@@ -94,3 +116,19 @@ kalloc(void)
   return (char*)r;
 }
 
+char* kalloc_lru_swap(struct proc* p)
+{
+  struct run *r;
+
+  if(kmem.use_lock)
+    acquire(&kmem.lock);
+  r = kmem.freelist;
+  if(r)
+  {
+    kmem.freelist = r->next;
+    get_lru(p->pid, (uint)r);
+  }
+  if(kmem.use_lock)
+    release(&kmem.lock);
+  return (char*)r;
+}

@@ -26,7 +26,9 @@ void init_lru_swap()
     for (int i = 0; i < MAX_FRAME_LRU_SWAP; i++)
     {
         bitmap.frame_bitmap[i] = -1;
+        lru.lru_frame_list[i].index = i;
         swap_bitmap.frame_bitmap[i] = -1;
+        swap.swap_frame_list[i].index = i;
     }
 }
 
@@ -55,6 +57,7 @@ int insert_lru(int pid, int vaddr)
         lru.lru_frame_list[index].next = lru.lru_frame_list[index].prev = &(lru.lru_frame_list[index]);
         lru.head = &(lru.lru_frame_list[index]);
         bitmap.frame_bitmap[index] = 1;
+        cprintf("LRU Inserted NO Head - PID: %d vaddr: %d index: %d\n", pid, vaddr, index);
         return 0;
     }
     struct frame *last = lru.head->prev;
@@ -66,22 +69,24 @@ int insert_lru(int pid, int vaddr)
     lru.lru_frame_list[index].pid = pid;
     lru.lru_frame_list[index].vaddr = vaddr;
     lru.lru_frame_list[index].next = lru.head;
-    lru.head->prev = &(lru.lru_frame_list[index]);
     lru.lru_frame_list[index].prev = last;
+    lru.head->prev = &(lru.lru_frame_list[index]);
     last->next = &(lru.lru_frame_list[index]);
     bitmap.frame_bitmap[index] = 1;
+    cprintf("LRU Inserted with Head - PID: %d vaddr: %d index: %d\n", pid, vaddr, index);
     return 0;
 }
 
 int delete_lru()
 {
+    cprintf("Helu, Inside delete lru for swapping!\n");
     if (lru.head == 0)
     {
         return -1;
     }
     else if (lru.head->next == lru.head)
     {
-        int index = (lru.head - &(lru.lru_frame_list[0]))/sizeof(struct frame);
+        int index = lru.head->index;
         lru.head->next = 0;
         lru.head->prev = 0;
         bitmap.frame_bitmap[index] = 0;
@@ -92,7 +97,7 @@ int delete_lru()
         struct frame *head = lru.head;
         lru.head->prev->next = lru.head->next;
         lru.head->next->prev = lru.head->prev;
-        int index = (lru.head - &(lru.lru_frame_list[0]))/sizeof(struct frame);
+        int index = lru.head->index;
         lru.head = lru.head->next;
         head->next = 0;
         head->prev = 0;
@@ -101,10 +106,20 @@ int delete_lru()
     }
 }
 
+int get_pid_lru_frame(int index)
+{
+    return lru.lru_frame_list[index].pid;
+}
+
+int get_vaddr_lru_frame(int index)
+{
+    return lru.lru_frame_list[index].vaddr;
+}
 
 /*
     Mandatory function after deleting a lru entry and getting the data from the lru;
 */
+
 void delete_lru_frame(int index)
 {
     bitmap.frame_bitmap[index] = -1;
@@ -114,36 +129,96 @@ void delete_lru_frame(int index)
     Free the lru doubly linked list for a PID and set the index 
     for it to be zero set the bit map to -1
 */
+void free_lru_frame(struct proc* p, int vaddr)
+{
+    cprintf("Hello. Inside free_lru_frame()\n");
+    if (lru.head == 0)
+    {
+        return;
+    }
+    struct frame *curr, *prev;
+    int index;
+    curr = lru.head;
+    prev = 0;
+
+    while (curr->pid != p->pid  && curr->vaddr == vaddr && curr->next != lru.head)
+    {
+        prev = curr;
+        curr = curr->next;
+    }
+
+    if (curr->pid == p->pid && curr->vaddr == vaddr)
+    {
+        if (curr == lru.head)
+        {
+            lru.head = lru.head->next;
+        }
+
+        if (curr == lru.head && prev != 0)
+        {
+            prev->next = lru.head;
+            lru.head->prev = prev;
+        }
+        else
+        {
+            curr->prev->next = curr->next;
+            curr->next->prev = curr->prev;
+        }
+        index = curr->index;
+        bitmap.frame_bitmap[index] = -1;
+        cprintf("LRU Single Deleted free_lru_frame() - PID: %d vaddr: %d index: %d\n", p->pid, vaddr, index);
+    }
+    else
+    {
+        panic("No vaddr found in free_lru");
+    }
+}
+
 void free_lru(int pid)
 {
     if (lru.head == 0)
     {
         return;
     }
-    struct frame *curr, *next;
+    cprintf("Hello. Inside free_lru() PID: %d\n", pid);
+    struct frame *curr;
     int index;
     curr = lru.head;
     do 
     {
-        next = curr->next;
         if (curr->pid == pid)
         {
-            if (curr->next == curr)
+            if (curr == lru.head)
             {
-                lru.head = 0;
+                lru.head = lru.head->next;
             }
-            else if (lru.head == curr)
+            if (curr->prev != 0)
             {
-                lru.head = curr->next;
+                curr->prev->next = curr->next;
             }
-            curr->prev->next = curr->next;
-            curr->next->prev = curr->prev;
-            index = (curr - &(lru.lru_frame_list[0]))/(sizeof(struct frame));
+            if (curr->next != 0)
+            {   
+                curr->next->prev = curr->prev;
+            }
+            index = curr->index;
             bitmap.frame_bitmap[index] = -1;
+            cprintf("LRU Deleted - PID: %d vaddr: %d index: %d\n", pid, curr->vaddr, index);
+            curr = curr->next;
         }
-        curr = next;
-    }while (curr != lru.head);
+        else
+        {
+            curr = curr->next;
+        }
+    } while (curr != lru.head);
+    if (curr->pid == pid)
+    {
+        cprintf("LRU Deleted - PID: %d vaddr: %d index: %d\n", pid, curr->vaddr, curr->index);
+        index = curr->index;
+        bitmap.frame_bitmap[index] = -1;
+        lru.head = 0;
+    }
 }
+
 
 
 /*
@@ -170,7 +245,7 @@ int swap_get_free_frame()
 {
     for (int i = 0 ; i < MAX_FRAME_LRU_SWAP ; i++)
     {
-        if (swap_bitmap.frame_bitmap[i] != -1)
+        if (swap_bitmap.frame_bitmap[i] == -1)
         {
             swap_bitmap.frame_bitmap[i] = 1;
             return i;
@@ -180,12 +255,13 @@ int swap_get_free_frame()
 }
 
 /*
-    This function is responsible for writing the function to the swap space.
+    This function is responsible for writing the page to the swap space.
     The data to be transfered in the swap space is stored in the buffer of the struct proc and then allocated.
     No changes related to lru pages done here done here.
 */
 int swap_out(struct proc* p, int vaddr)
 {
+    cprintf("Swapping out PID : %d Vadder : %d\n", p->pid, vaddr);
     int findex, i;
     struct buf* buffer;
     pte_t *pte;
@@ -237,9 +313,8 @@ int swap_out(struct proc* p, int vaddr)
     {
         panic("Map pages failed");
     }
-    kfree((char *)vaddr);
+    kfree_lru_swap(p, (char *)vaddr);
     return 1;
-
 }
 
 /*
@@ -248,6 +323,7 @@ int swap_out(struct proc* p, int vaddr)
 */
 int swap_in(struct proc* p, int vaddr)
 {
+    cprintf("Swapping in PID : %d Vadder : %d\n", p->pid, vaddr);
     struct disk_frame* curr = p->swap_list;
     char* mem;
     int flag, findex, i;
@@ -268,7 +344,7 @@ int swap_in(struct proc* p, int vaddr)
         return -1;
     }
     flag = 0;
-    findex = (curr - &(swap.swap_frame_list[0]))/sizeof(struct disk_frame);
+    findex = curr->index;
     for (i = 0 ; i < 8 ; i++)
     {   
         buffer = bread(ROOTDEV, SWAP_START+findex*8 + i);
@@ -278,7 +354,10 @@ int swap_in(struct proc* p, int vaddr)
     swap_bitmap.frame_bitmap[findex] = -1;
     //Updated Page Directory
     //Should Not be present here.
-    mem = kalloc();
+    if ((mem = kalloc_lru_swap(p)) == 0)
+    {
+        panic("No Free Page");
+    }
     memmove(mem, p->buffer, PGSIZE);
     if(mappages(p->pgdir, (char*)vaddr, PGSIZE, V2P(mem), PTE_W|PTE_U, 1) < 0)
       return -1;
@@ -293,6 +372,10 @@ int swap_check(struct proc* p, int vaddr)
 {
     struct disk_frame* df;
     df = p->swap_list;
+    if (df == 0)
+    {
+        return -1;
+    }
     while (df->next != 0)
     {
         if (df->vaddr == vaddr)
@@ -311,5 +394,47 @@ void free_swap(int pid)
     {
         if (swap.swap_frame_list[i].pid == pid)
             swap_bitmap.frame_bitmap[i] = -1;
+    }
+}
+
+/*
+    void get_lru(struct proc* p, int vaddr)
+    This will make a call to insert lru.
+    If successful, return
+    If not, delete a lru, get the pid and vaddr, delete the frame
+    get the proc related to the PID.
+    If not present call the free_swap and free_lru for PID.
+    If present call the swap out function and swap out the page.
+    make the insert lru call again.
+    basically have a while loop.
+*/
+
+void get_lru(int pid, int vaddr)
+{
+    int index, vaddr_lru, pid_lru;
+    struct proc* pr;
+    while (insert_lru(pid, vaddr) < 0)
+    {   
+        cprintf("GADBAD\n");
+        if ((index = delete_lru()) < 0)
+        {
+            panic("LRU full as well as empty.");
+        }
+        pid_lru = get_pid_lru_frame(index);
+        vaddr_lru = get_vaddr_lru_frame(index);
+        delete_lru_frame(index);
+        if ((pr = get_proc(pid_lru)) == 0)
+        {
+            free_lru(pid_lru);
+            free_swap(pid_lru);
+        }
+        else
+        {
+            if(swap_out(pr, vaddr_lru) < 0)
+            {
+                panic("Swap Space is Full");
+            }
+        }
+
     }
 }
