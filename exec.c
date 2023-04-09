@@ -19,7 +19,7 @@ exec(char *path, char **argv)
   char *s, *last;
 
   begin_op();
-
+  cprintf("Entering Exed\n");
   if((ip = namei(path)) == 0){
     end_op();
     cprintf("exec: fail\n");
@@ -67,47 +67,50 @@ exec(char *path, char **argv)
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
   sz = PGROUNDUP(sz);
-  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE, 1)) == 0)
+  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE, 0)) == 0)
     goto bad;
   clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
-  sp = sz;
+  sp = PGSIZE;
 
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
       goto bad;
     sp = (sp - (strlen(argv[argc]) + 1)) & ~3;
-    if(copyout(pgdir, sp, argv[argc], strlen(argv[argc]) + 1) < 0)
-      goto bad;
-    ustack[3+argc] = sp;
+    safestrcpy(&(curproc->buffer[sp]), argv[argc], strlen(argv[argc]) + 1);
+    ustack[3+argc] = PGROUNDUP(curproc->cdb_size) + PGSIZE + sp; 
   }
   ustack[3+argc] = 0;
 
   ustack[0] = 0xffffffff;  // fake return PC
   ustack[1] = argc;
-  ustack[2] = sp - (argc+1)*4;  // argv pointer
+  ustack[2] =  PGROUNDUP(curproc->cdb_size) + PGSIZE + (sp - (argc+1)*4);  // argv pointer
 
   sp -= (3+argc+1) * 4;
-  if(copyout(pgdir, sp, ustack, (3+argc+1)*4) < 0)
-    goto bad;
+  memmove(curproc->buffer + sp, ustack, (3+argc+1)*4);
 
   //Adding Path as well as Name.
+  safestrcpy(curproc->path, path, strlen(path)+1);
   for (last=s=path; *s; s++)
     if (*s == '/')
       last=s+1;
   safestrcpy(curproc->name, last, sizeof(curproc->path));
-
-  safestrcpy(curproc->path, path, strlen(path)+1);
 
   // Commit to the user image.
   oldpgdir = curproc->pgdir;
   curproc->pgdir = pgdir;
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
-  curproc->tf->esp = sp;
+  curproc->tf->esp = PGROUNDUP(curproc->cdb_size) + PGSIZE + sp;
   switchuvm(curproc);
   free_lru(curproc->pid);
   free_swap(curproc->pid);
+  cprintf("swap_out called from exec\n");
+  curproc->swap_list = 0;
+  if(swap_out(curproc, sz-PGSIZE, 0) < 0)
+  {
+    panic("Swap Space is Full");
+  }
   freevm(oldpgdir);
   return 0;
 
@@ -116,6 +119,7 @@ exec(char *path, char **argv)
   {
     free_lru(curproc->pid);
     free_swap(curproc->pid);
+    curproc->swap_list = 0;
     freevm(pgdir);
   }
   if(ip)

@@ -160,14 +160,25 @@ userinit(void)
 int
 growproc(int n)
 {
-  uint sz;
+  uint sz, pages, i;
   struct proc *curproc = myproc();
 
   sz = curproc->sz;
   if(n > 0){
-    if((sz = allocuvm(curproc->pgdir, sz, sz + n, 1)) == 0)
+    if((sz = allocuvm(curproc->pgdir, sz, sz + n, 0)) == 0)
       return -1;
-  } else if(n < 0){
+    pages = (PGROUNDUP(sz) - PGROUNDUP(curproc->sz))/PGSIZE;
+    for (i = 0 ; i < pages ; i++)
+    {
+      memset(curproc->buffer, 0 , PGSIZE);
+      cprintf("swap_out called from growproc\n");
+      if(swap_out(curproc, curproc->sz + i*PGSIZE, 0) < 0)
+      {
+        return -1;
+      }
+    }
+  }
+  if(n < 0){
     if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
   }

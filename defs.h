@@ -105,7 +105,7 @@ void            free_lru_frame(struct proc* p, int vaddr);
 void            free_lru(int pid);
 int             get_pid_lru_frame(int index);
 int             get_vaddr_lru_frame(int index);
-int             swap_out(struct proc* p, int vaddr);
+int             swap_out(struct proc* p, int vaddr, int kfree_flag);
 int             swap_in(struct proc* p, int vaddr);
 int             swap_check(struct proc* p, int vaddr);
 void            free_swap(int pid);

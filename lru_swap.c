@@ -186,10 +186,6 @@ void free_lru_frame(struct proc* p, int vaddr)
         bitmap.frame_bitmap[index] = -1;
         cprintf("LRU Single Deleted free_lru_frame() - PID: %d vaddr: %d index: %d\n", p->pid, vaddr, index);
     }
-    else
-    {
-        panic("No vaddr found in free_lru");
-    }
     release(&lru.lk);
 }
 
@@ -280,7 +276,7 @@ int swap_get_free_frame()
     The data to be transfered in the swap space is stored in the buffer of the struct proc and then allocated.
     No changes related to lru pages done here done here.
 */
-int swap_out(struct proc* p, int vaddr)
+int swap_out(struct proc* p, int vaddr, int kfree_flag)
 {
     cprintf("Swapping out PID : %d Vadder : %d\n", p->pid, vaddr);
     int findex, i;
@@ -288,17 +284,18 @@ int swap_out(struct proc* p, int vaddr)
     pte_t *pte;
     uint pa;
     struct disk_frame* curr = p->swap_list;
-    if (curr == 0)
+    if (p->swap_list == 0)
     {
         acquire(&swap.lk);
         if ((findex = swap_get_free_frame()) < 0)
         {
             return -1;
         }
-        curr = &(swap.swap_frame_list[findex]);
-        curr->vaddr = vaddr;
-        curr->pid = p->pid;
-        curr->next = 0;
+        cprintf("Hello curr == 0 for this process with findex : %d\n", findex);
+        p->swap_list = &(swap.swap_frame_list[findex]);
+        p->swap_list->vaddr = vaddr;
+        p->swap_list->pid = p->pid;
+        p->swap_list->next = 0;
         release(&swap.lk);
         for (i = 0 ; i < 8 ; i++){
             buffer = bget(ROOTDEV, SWAP_START+findex*8 + i);
@@ -306,6 +303,10 @@ int swap_out(struct proc* p, int vaddr)
             bwrite(buffer);
             brelse(buffer);
         }
+        if (kfree_flag)
+            kfree_lru_swap(p, (char *)vaddr);
+        else
+            free_lru_frame(p, vaddr);
         return 1;
     }
     while (curr->next != 0)
@@ -317,6 +318,7 @@ int swap_out(struct proc* p, int vaddr)
     {
         return -1;
     }
+     cprintf("Hello findex : %d\n", findex);
     curr->next = &(swap.swap_frame_list[findex]);
     curr = curr->next;
     curr->vaddr = vaddr;
@@ -338,7 +340,10 @@ int swap_out(struct proc* p, int vaddr)
     {
         panic("Map pages failed");
     }
-    kfree_lru_swap(p, (char *)vaddr);
+    if (kfree_flag)
+        kfree_lru_swap(p, (char *)vaddr);
+    else
+        free_lru_frame(p, vaddr);
     return 1;
 }
 
@@ -367,10 +372,12 @@ int swap_in(struct proc* p, int vaddr)
         }
     }
     if (flag == 1){
+        release(&swap.lk);
         return -1;
     }
     flag = 0;
     findex = curr->index;
+    cprintf("In Swap In findex : %d\n", findex);
     swap_bitmap.frame_bitmap[findex] = -1;
     release(&swap.lk);
     for (i = 0 ; i < 8 ; i++)
@@ -386,7 +393,7 @@ int swap_in(struct proc* p, int vaddr)
         panic("No Free Page");
     }
     memmove(mem, p->buffer, PGSIZE);
-    if(mappages(p->pgdir, (char*)vaddr, PGSIZE, V2P(mem), PTE_W|PTE_U, 1) < 0)
+    if(mappages(p->pgdir, (char*)vaddr, PGSIZE, V2P(mem), PTE_W | PTE_U | PTE_P, 1) < 0)
       return -1;
     return 0;
 }
@@ -406,6 +413,7 @@ int swap_check(struct proc* p, int vaddr)
     acquire(&swap.lk);
     while (df->next != 0)
     {
+        cprintf("VADDR : %d\n", df->vaddr);
         if (df->vaddr == vaddr)
         {
             release(&swap.lk);
@@ -464,7 +472,8 @@ void get_lru(int pid, int vaddr)
         }
         else
         {
-            if(swap_out(pr, vaddr_lru) < 0)
+            cprintf("swap_out called from get_lru\n");
+            if(swap_out(pr, vaddr_lru, 1) < 0)
             {
                 panic("Swap Space is Full");
             }
