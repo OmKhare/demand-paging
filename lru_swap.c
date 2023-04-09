@@ -9,17 +9,20 @@ Includes implementation of the functions to handle a doubly circular list.
 
 #include "types.h"
 #include "param.h"
-#include "spinlock.h"
-#include "sleeplock.h"
-#include "fs.h"
-#include "buf.h"
 #include "defs.h"
 #include "stat.h"
 #include "mmu.h"
 #include "proc.h"
 #include "memlayout.h"
+#include "spinlock.h"
+#include "sleeplock.h"
+#include "fs.h"
+#include "buf.h"
 #include "lru_swap.h"
 
+/*
+    Wont need any locks.
+*/
 void init_lru_swap()
 {
     // Iniitalisation of the lock to be taken into account after lock added.
@@ -30,6 +33,8 @@ void init_lru_swap()
         swap_bitmap.frame_bitmap[i] = -1;
         swap.swap_frame_list[i].index = i;
     }
+    initlock(&lru.lk, "lru");
+    initlock(&swap.lk, "swap");
 }
 
 int get_free_frame_lru()
@@ -37,7 +42,9 @@ int get_free_frame_lru()
     for (int i = 0; i < MAX_FRAME_LRU_SWAP; i++)
     {
         if (bitmap.frame_bitmap[i] == -1)
+        {   
             return i;
+        }
     }
     return -1;
 }
@@ -47,9 +54,11 @@ int insert_lru(int pid, int vaddr)
     int index;
     if (lru.head == 0)
     {
+        acquire(&lru.lk);
         index = get_free_frame_lru();
         if (index == -1)
         {
+            release(&lru.lk);
             return -1;
         }
         lru.lru_frame_list[index].pid = pid;
@@ -57,13 +66,16 @@ int insert_lru(int pid, int vaddr)
         lru.lru_frame_list[index].next = lru.lru_frame_list[index].prev = &(lru.lru_frame_list[index]);
         lru.head = &(lru.lru_frame_list[index]);
         bitmap.frame_bitmap[index] = 1;
-        cprintf("LRU Inserted NO Head - PID: %d vaddr: %d index: %d\n", pid, vaddr, index);
+        release(&lru.lk);
+        // cprintf("LRU Inserted NO Head - PID: %d vaddr: %d index: %d\n", pid, vaddr, index);
         return 0;
     }
     struct frame *last = lru.head->prev;
+    acquire(&lru.lk);
     index = get_free_frame_lru();
     if (index == -1)
     {
+        release(&lru.lk);
         return -1;
     }
     lru.lru_frame_list[index].pid = pid;
@@ -73,7 +85,8 @@ int insert_lru(int pid, int vaddr)
     lru.head->prev = &(lru.lru_frame_list[index]);
     last->next = &(lru.lru_frame_list[index]);
     bitmap.frame_bitmap[index] = 1;
-    cprintf("LRU Inserted with Head - PID: %d vaddr: %d index: %d\n", pid, vaddr, index);
+    release(&lru.lk);
+    // cprintf("LRU Inserted with Head - PID: %d vaddr: %d index: %d\n", pid, vaddr, index);
     return 0;
 }
 
@@ -86,14 +99,17 @@ int delete_lru()
     }
     else if (lru.head->next == lru.head)
     {
+        acquire(&lru.lk);
         int index = lru.head->index;
         lru.head->next = 0;
         lru.head->prev = 0;
         bitmap.frame_bitmap[index] = 0;
+        release(&lru.lk);
         return index;
     }
     else
     {
+        acquire(&lru.lk);
         struct frame *head = lru.head;
         lru.head->prev->next = lru.head->next;
         lru.head->next->prev = lru.head->prev;
@@ -102,6 +118,7 @@ int delete_lru()
         head->next = 0;
         head->prev = 0;
         bitmap.frame_bitmap[index] = 0;
+        release(&lru.lk);
         return index;
     }
 }
@@ -141,6 +158,7 @@ void free_lru_frame(struct proc* p, int vaddr)
     curr = lru.head;
     prev = 0;
 
+    acquire(&lru.lk);
     while (curr->pid != p->pid  && curr->vaddr == vaddr && curr->next != lru.head)
     {
         prev = curr;
@@ -172,6 +190,7 @@ void free_lru_frame(struct proc* p, int vaddr)
     {
         panic("No vaddr found in free_lru");
     }
+    release(&lru.lk);
 }
 
 void free_lru(int pid)
@@ -184,6 +203,7 @@ void free_lru(int pid)
     struct frame *curr;
     int index;
     curr = lru.head;
+    acquire(&lru.lk);
     do 
     {
         if (curr->pid == pid)
@@ -217,6 +237,7 @@ void free_lru(int pid)
         bitmap.frame_bitmap[index] = -1;
         lru.head = 0;
     }
+    release(&lru.lk);
 }
 
 
@@ -269,6 +290,7 @@ int swap_out(struct proc* p, int vaddr)
     struct disk_frame* curr = p->swap_list;
     if (curr == 0)
     {
+        acquire(&swap.lk);
         if ((findex = swap_get_free_frame()) < 0)
         {
             return -1;
@@ -277,6 +299,7 @@ int swap_out(struct proc* p, int vaddr)
         curr->vaddr = vaddr;
         curr->pid = p->pid;
         curr->next = 0;
+        release(&swap.lk);
         for (i = 0 ; i < 8 ; i++){
             buffer = bget(ROOTDEV, SWAP_START+findex*8 + i);
             memmove(buffer->data, p->buffer + BSIZE*i, BSIZE);
@@ -289,6 +312,7 @@ int swap_out(struct proc* p, int vaddr)
     {
         curr = curr->next;
     }
+    acquire(&swap.lk);
     if ((findex = swap_get_free_frame()) < 0)
     {
         return -1;
@@ -298,6 +322,7 @@ int swap_out(struct proc* p, int vaddr)
     curr->vaddr = vaddr;
     curr->pid = p->pid;
     curr->next = 0;
+    release(&swap.lk);
     for (i = 0 ; i < 8 ; i++){
         buffer = bget(ROOTDEV, SWAP_START+findex*8 + i);
         memmove(buffer->data, p->buffer + BSIZE*i, BSIZE);
@@ -332,6 +357,7 @@ int swap_in(struct proc* p, int vaddr)
     {
         return -1;
     }
+    acquire(&swap.lk);
     while(curr->next != 0)
     {
         if(curr->vaddr == vaddr)
@@ -345,13 +371,14 @@ int swap_in(struct proc* p, int vaddr)
     }
     flag = 0;
     findex = curr->index;
+    swap_bitmap.frame_bitmap[findex] = -1;
+    release(&swap.lk);
     for (i = 0 ; i < 8 ; i++)
     {   
         buffer = bread(ROOTDEV, SWAP_START+findex*8 + i);
         memmove(p->buffer + BSIZE*i, buffer->data, BSIZE);
         brelse(buffer);
     }
-    swap_bitmap.frame_bitmap[findex] = -1;
     //Updated Page Directory
     //Should Not be present here.
     if ((mem = kalloc_lru_swap(p)) == 0)
@@ -376,11 +403,16 @@ int swap_check(struct proc* p, int vaddr)
     {
         return -1;
     }
+    acquire(&swap.lk);
     while (df->next != 0)
     {
         if (df->vaddr == vaddr)
+        {
+            release(&swap.lk);
             return 0;
+        }
     }
+    release(&swap.lk);
     return -1;
 }
 
@@ -390,11 +422,13 @@ int swap_check(struct proc* p, int vaddr)
 void free_swap(int pid)
 {
     int i;
+    acquire(&swap.lk);
     for (i = 0 ; i < MAX_FRAME_LRU_SWAP ; i++)
     {
         if (swap.swap_frame_list[i].pid == pid)
             swap_bitmap.frame_bitmap[i] = -1;
     }
+    release(&swap.lk);
 }
 
 /*

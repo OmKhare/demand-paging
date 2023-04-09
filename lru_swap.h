@@ -8,7 +8,7 @@ all the pages being swapped out of the system.
 #define LRU_SWAP_H_
 
 // #define MAX_FRAME_LRU_SWAP 2560 //So total 20480 blocks in memory and 2560 pages can be present in LRU
-#define MAX_FRAME_LRU_SWAP 10
+#define MAX_FRAME_LRU_SWAP 2560
 //2560 Number can be managed as per the actual pages present in the system.
 
 
@@ -42,10 +42,12 @@ struct{
 struct{
     struct frame* head;
     struct frame lru_frame_list[MAX_FRAME_LRU_SWAP];
+    struct spinlock lk;
 }lru;
 
 struct{
     struct disk_frame swap_frame_list[MAX_FRAME_LRU_SWAP];
+    struct spinlock lk;
 }swap;
 
 #endif
