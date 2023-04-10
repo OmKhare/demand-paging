@@ -105,10 +105,13 @@ void            free_lru_frame(struct proc* p, int vaddr);
 void            free_lru(int pid);
 int             get_pid_lru_frame(int index);
 int             get_vaddr_lru_frame(int index);
+void            read_lru();
 int             swap_out(struct proc* p, int vaddr, int kfree_flag);
 int             swap_in(struct proc* p, int vaddr);
 int             swap_check(struct proc* p, int vaddr);
 void            free_swap(int pid);
+void            read_swap(struct proc* p);
+void            swap_duplicate(struct proc* new, struct proc* old);
 // NOW THE INTEGRATED FUNCTIONS
 void            get_lru(int, int);
 

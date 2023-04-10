@@ -171,7 +171,7 @@ growproc(int n)
     for (i = 0 ; i < pages ; i++)
     {
       memset(curproc->buffer, 0 , PGSIZE);
-      cprintf("swap_out called from growproc\n");
+
       if(swap_out(curproc, curproc->sz + i*PGSIZE, 0) < 0)
       {
         return -1;
@@ -196,6 +196,7 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *curproc = myproc();
+  curproc->forked = 1;
 
   // Allocate process.
   if((np = allocproc()) == 0){
@@ -212,7 +213,6 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -220,7 +220,10 @@ fork(void)
     if(curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
   np->cwd = idup(curproc->cwd);
-  np->swap_list = 0;
+  np->forked = 0;
+
+  //Error here due to which user tests are failing.
+  np->swap_list = curproc->swap_list;
 
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 

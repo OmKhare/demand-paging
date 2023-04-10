@@ -31,7 +31,7 @@ struct disk_frame{
     int pid;
     int vaddr;
     int index;
-    struct disk_frame* next;
+    int next;
 };
 
 struct{

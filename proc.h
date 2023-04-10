@@ -52,6 +52,7 @@ struct proc {
   char path[512];              // Path of the current Process.
   uint cdb_size;               // Size of the program after only loading the Code+Data+bss
   struct disk_frame* swap_list;
+  int forked;
   char buffer[PGSIZE];
 };
 

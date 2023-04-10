@@ -22,8 +22,7 @@ void pgflt_handler()
     uint i, off;
     char* mem;
     uint pgflt_addr = PGROUNDDOWN(rcr2());
-    cprintf("rcr2 value : %d\n", pgflt_addr);
-    cprintf("PID of the process : %d\n", curproc->pid);
+    cprintf("Page Fault Occoured for Vaddr : %d\n", pgflt_addr);
     if (pgflt_addr > KERNBASE)
     {
         panic("Over the KERNBASE!");
@@ -46,7 +45,6 @@ void pgflt_handler()
             Stack and Heap to be thought off afterwards.
         */
         get_lru(curproc->pid, pgflt_addr);
-        cprintf("Hello\n");
         if (swap_check(curproc, pgflt_addr) == 0)
         {
             //Handle the reading from the swap and returning here.

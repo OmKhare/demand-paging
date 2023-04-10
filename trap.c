@@ -50,7 +50,6 @@ trap(struct trapframe *tf)
 
   //Add a check here to detect whether the page fault has occured or the system actually has a illegal memory access.
   case T_PGFLT:
-    cprintf("Page Fault Occoured!\n");
     pgflt_handler();
     lapiceoi();
     break;

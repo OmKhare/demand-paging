@@ -67,7 +67,6 @@ int insert_lru(int pid, int vaddr)
         lru.head = &(lru.lru_frame_list[index]);
         bitmap.frame_bitmap[index] = 1;
         release(&lru.lk);
-        // cprintf("LRU Inserted NO Head - PID: %d vaddr: %d index: %d\n", pid, vaddr, index);
         return 0;
     }
     struct frame *last = lru.head->prev;
@@ -86,13 +85,11 @@ int insert_lru(int pid, int vaddr)
     last->next = &(lru.lru_frame_list[index]);
     bitmap.frame_bitmap[index] = 1;
     release(&lru.lk);
-    // cprintf("LRU Inserted with Head - PID: %d vaddr: %d index: %d\n", pid, vaddr, index);
     return 0;
 }
 
 int delete_lru()
 {
-    cprintf("Helu, Inside delete lru for swapping!\n");
     if (lru.head == 0)
     {
         return -1;
@@ -148,7 +145,6 @@ void delete_lru_frame(int index)
 */
 void free_lru_frame(struct proc* p, int vaddr)
 {
-    cprintf("Hello. Inside free_lru_frame()\n");
     if (lru.head == 0)
     {
         return;
@@ -157,7 +153,6 @@ void free_lru_frame(struct proc* p, int vaddr)
     int index;
     curr = lru.head;
     prev = 0;
-
     acquire(&lru.lk);
     while (curr->pid != p->pid  && curr->vaddr == vaddr && curr->next != lru.head)
     {
@@ -184,7 +179,6 @@ void free_lru_frame(struct proc* p, int vaddr)
         }
         index = curr->index;
         bitmap.frame_bitmap[index] = -1;
-        cprintf("LRU Single Deleted free_lru_frame() - PID: %d vaddr: %d index: %d\n", p->pid, vaddr, index);
     }
     release(&lru.lk);
 }
@@ -195,7 +189,6 @@ void free_lru(int pid)
     {
         return;
     }
-    cprintf("Hello. Inside free_lru() PID: %d\n", pid);
     struct frame *curr;
     int index;
     curr = lru.head;
@@ -218,7 +211,6 @@ void free_lru(int pid)
             }
             index = curr->index;
             bitmap.frame_bitmap[index] = -1;
-            cprintf("LRU Deleted - PID: %d vaddr: %d index: %d\n", pid, curr->vaddr, index);
             curr = curr->next;
         }
         else
@@ -228,7 +220,6 @@ void free_lru(int pid)
     } while (curr != lru.head);
     if (curr->pid == pid)
     {
-        cprintf("LRU Deleted - PID: %d vaddr: %d index: %d\n", pid, curr->vaddr, curr->index);
         index = curr->index;
         bitmap.frame_bitmap[index] = -1;
         lru.head = 0;
@@ -236,6 +227,24 @@ void free_lru(int pid)
     release(&lru.lk);
 }
 
+void read_lru()
+{
+    struct frame* curr = lru.head;
+    if (lru.head == 0){
+        cprintf("Empty Lsit!\n");
+        return;
+    }
+    cprintf("PID : %d | Index : %d | Vaddr : %d", curr->pid ,curr->index, curr->pid);
+    curr = curr->next;
+    while (curr != lru.head){
+        cprintf("PID : %d | Index : %d | Vaddr : %d", curr->pid ,curr->index, curr->pid);
+        curr = curr->next;
+        if (curr != lru.head){
+            cprintf(" -> ");
+        }
+    }
+    cprintf("\n");
+}
 
 
 /*
@@ -276,9 +285,10 @@ int swap_get_free_frame()
     The data to be transfered in the swap space is stored in the buffer of the struct proc and then allocated.
     No changes related to lru pages done here done here.
 */
+
 int swap_out(struct proc* p, int vaddr, int kfree_flag)
 {
-    cprintf("Swapping out PID : %d Vadder : %d\n", p->pid, vaddr);
+    cprintf("Swapping out for PID : %d | vaddr : %d\n", p->pid, vaddr);
     int findex, i;
     struct buf* buffer;
     pte_t *pte;
@@ -291,11 +301,10 @@ int swap_out(struct proc* p, int vaddr, int kfree_flag)
         {
             return -1;
         }
-        cprintf("Hello curr == 0 for this process with findex : %d\n", findex);
         p->swap_list = &(swap.swap_frame_list[findex]);
-        p->swap_list->vaddr = vaddr;
-        p->swap_list->pid = p->pid;
-        p->swap_list->next = 0;
+        swap.swap_frame_list[findex].next = -1;
+        swap.swap_frame_list[findex].pid = p->pid;
+        swap.swap_frame_list[findex].vaddr = vaddr;
         release(&swap.lk);
         for (i = 0 ; i < 8 ; i++){
             buffer = bget(ROOTDEV, SWAP_START+findex*8 + i);
@@ -309,21 +318,19 @@ int swap_out(struct proc* p, int vaddr, int kfree_flag)
             free_lru_frame(p, vaddr);
         return 1;
     }
-    while (curr->next != 0)
+    while (curr->next != -1)
     {
-        curr = curr->next;
+        curr = &(swap.swap_frame_list[curr->next]);
     }
     acquire(&swap.lk);
     if ((findex = swap_get_free_frame()) < 0)
     {
         return -1;
     }
-     cprintf("Hello findex : %d\n", findex);
-    curr->next = &(swap.swap_frame_list[findex]);
-    curr = curr->next;
-    curr->vaddr = vaddr;
-    curr->pid = p->pid;
-    curr->next = 0;
+    curr->next = findex;
+    swap.swap_frame_list[findex].next = -1;
+    swap.swap_frame_list[findex].pid = p->pid;
+    swap.swap_frame_list[findex].vaddr = vaddr;
     release(&swap.lk);
     for (i = 0 ; i < 8 ; i++){
         buffer = bget(ROOTDEV, SWAP_START+findex*8 + i);
@@ -353,31 +360,55 @@ int swap_out(struct proc* p, int vaddr, int kfree_flag)
 */
 int swap_in(struct proc* p, int vaddr)
 {
-    cprintf("Swapping in PID : %d Vadder : %d\n", p->pid, vaddr);
-    struct disk_frame* curr = p->swap_list;
+    cprintf("Swapping in for PID : %d | vaddr : %d\n", p->pid, vaddr);
+    struct disk_frame* curr = p->swap_list, *prev = 0;
     char* mem;
-    int flag, findex, i;
+    int flag = 0, findex, i;
     struct buf* buffer;
     if (curr == 0)
     {
         return -1;
     }
     acquire(&swap.lk);
-    while(curr->next != 0)
+    if (curr->next == -1){
+        if (curr->vaddr == vaddr)
+        {
+            flag = 1;
+        } 
+    }
+    while(curr->next != -1)
     {
         if(curr->vaddr == vaddr)
         {
             flag = 1;
             break;
         }
+        prev = curr;
+        curr = &(swap.swap_frame_list[curr->next]);
+        if (curr->next == -1){
+            if (curr->vaddr == vaddr)
+            {
+                flag = 1;
+                break;
+            } 
+        }
     }
-    if (flag == 1){
+    if (flag == 0){
         release(&swap.lk);
         return -1;
     }
     flag = 0;
     findex = curr->index;
-    cprintf("In Swap In findex : %d\n", findex);
+    if (&(swap.swap_frame_list[findex]) == p->swap_list){
+        if (swap.swap_frame_list[findex].next == -1)
+        {
+            p->swap_list = 0;
+        }else{
+            p->swap_list = &(swap.swap_frame_list[swap.swap_frame_list[findex].next]);
+        }
+    }else{
+        prev->next = curr->next;
+    }
     swap_bitmap.frame_bitmap[findex] = -1;
     release(&swap.lk);
     for (i = 0 ; i < 8 ; i++)
@@ -411,13 +442,27 @@ int swap_check(struct proc* p, int vaddr)
         return -1;
     }
     acquire(&swap.lk);
-    while (df->next != 0)
-    {
-        cprintf("VADDR : %d\n", df->vaddr);
+    if (df->next == -1){
         if (df->vaddr == vaddr)
         {
             release(&swap.lk);
             return 0;
+        } 
+    }
+    while (df->next != -1)
+    {
+        if (df->vaddr == vaddr)
+        {
+            release(&swap.lk);
+            return 0;
+        }
+        df = &(swap.swap_frame_list[df->next]);
+        if (df->next == -1){
+            if (df->vaddr == vaddr)
+            {
+                release(&swap.lk);
+                return 0;
+            } 
         }
     }
     release(&swap.lk);
@@ -430,6 +475,14 @@ int swap_check(struct proc* p, int vaddr)
 void free_swap(int pid)
 {
     int i;
+    struct proc* p = get_proc(pid);
+    if (p)
+    {
+        p->swap_list = 0;
+        if (p->forked == 1){
+            return;
+        }
+    }
     acquire(&swap.lk);
     for (i = 0 ; i < MAX_FRAME_LRU_SWAP ; i++)
     {
@@ -437,6 +490,24 @@ void free_swap(int pid)
             swap_bitmap.frame_bitmap[i] = -1;
     }
     release(&swap.lk);
+}
+
+void read_swap(struct proc* p)
+{   
+    struct disk_frame* df = p->swap_list;
+    if (df != 0){
+        cprintf("Displaying the Swap array for the process with PID : %d\n", p->pid);
+        cprintf("Index : %d | Vaddr : %d", df->index, df->vaddr);
+         cprintf(" -> ");
+    }
+    while (df != 0 && df->next != -1){
+        df = &(swap.swap_frame_list[df->next]);
+        cprintf("Index : %d | Vaddr : %d", df->index, df->vaddr);
+        if (df->next != -1){
+            cprintf(" -> ");
+        }
+    }
+    cprintf("\n");
 }
 
 /*
@@ -457,7 +528,6 @@ void get_lru(int pid, int vaddr)
     struct proc* pr;
     while (insert_lru(pid, vaddr) < 0)
     {   
-        cprintf("GADBAD\n");
         if ((index = delete_lru()) < 0)
         {
             panic("LRU full as well as empty.");
@@ -472,7 +542,6 @@ void get_lru(int pid, int vaddr)
         }
         else
         {
-            cprintf("swap_out called from get_lru\n");
             if(swap_out(pr, vaddr_lru, 1) < 0)
             {
                 panic("Swap Space is Full");

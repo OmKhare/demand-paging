@@ -80,7 +80,6 @@ void
 kfree_lru_swap(struct proc* p, char *v)
 {
   struct run *r;
-  cprintf("Helu kfree_lru_swap\n");
   if((uint)v % PGSIZE || v < end || V2P(v) >= PHYSTOP)
     panic("kfree");
 

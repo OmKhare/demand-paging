@@ -19,10 +19,8 @@ exec(char *path, char **argv)
   char *s, *last;
 
   begin_op();
-  cprintf("Entering Exed\n");
   if((ip = namei(path)) == 0){
     end_op();
-    cprintf("exec: fail\n");
     return -1;
   }
   ilock(ip);
@@ -105,7 +103,6 @@ exec(char *path, char **argv)
   switchuvm(curproc);
   free_lru(curproc->pid);
   free_swap(curproc->pid);
-  cprintf("swap_out called from exec\n");
   curproc->swap_list = 0;
   if(swap_out(curproc, sz-PGSIZE, 0) < 0)
   {

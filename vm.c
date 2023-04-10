@@ -313,7 +313,7 @@ copyuvm(struct proc* old, struct proc* new)
 {
   pde_t *d;
   pte_t *pte;
-  uint pa = 0, i, flags = 0, avl = 0;
+  uint pa = 0, i, flags = 0;
   char *mem = 0;
 
   if((d = setupkvm()) == 0)
@@ -334,9 +334,8 @@ copyuvm(struct proc* old, struct proc* new)
         goto bad;
       pa = PTE_ADDR(*pte);
       flags = PTE_FLAGS(*pte);
-      avl = PTE_AVL(*pte);
       memmove(mem, (char*)P2V(pa), PGSIZE);
-      if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags, avl) < 0) 
+      if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags, 1) < 0) 
       {
         kfree_lru_swap(new, mem);
         goto bad;
