@@ -74,7 +74,7 @@ void            ioapicinit(void);
 char*           kalloc(void);
 char*           kalloc_lru_swap(struct proc*);
 void            kfree(char*);
-void            kfree_lru_swap(struct proc*, char *);
+void            klru_free_swap(struct proc*, char *);
 void            kinit1(void*, void*);
 void            kinit2(void*, void*);
 
@@ -97,21 +97,22 @@ void            begin_op();
 void            end_op();
 
 // lru_swap.c
-void            init_lru_swap();
-int             insert_lru(int pid, int vaddr);
-int             delete_lru(); // This function sets the bit in the function to 0 so that the data in it stays.
-void            delete_lru_frame(int index); // After getting the necessary data from the struct frame, the index in the bitmap is set to -1.
-void            free_lru_frame(struct proc* p, int vaddr);
-void            free_lru(int pid);
-int             get_pid_lru_frame(int index);
-int             get_vaddr_lru_frame(int index);
-void            read_lru();
+void            lru_swap_init();
+int             lru_insert(int pid, int vaddr);
+void            lru_delete_frame(int index);
+int             lru_delete();
+void            lru_free_frame(struct proc* p, int vaddr);
+void            lru_free(int pid);
+int             lru_get_pid_frame(int index);
+int             lru_get_vaddr_frame(int index);
+void            lru_read();
 int             swap_out(struct proc* p, int vaddr, int kfree_flag);
 int             swap_in(struct proc* p, int vaddr);
 int             swap_check(struct proc* p, int vaddr);
-void            free_swap(int pid);
-void            read_swap(struct proc* p);
+void            swap_free(int pid);
+void            swap_read(struct proc* p);
 void            swap_duplicate(struct proc* new, struct proc* old);
+void            swap_fork(struct proc* p);
 // NOW THE INTEGRATED FUNCTIONS
 void            get_lru(int, int);
 

@@ -33,7 +33,7 @@ main(void)
   ideinit();       // disk 
   startothers();   // start other processors
   kinit2(P2V(4*1024*1024), P2V(PHYSTOP)); // must come after startothers()
-  init_lru_swap(); // LRU and Swap Space initialisation
+  lru_swap_init(); // LRU and Swap Space initialisation
   userinit();      // first user process
   mpmain();        // finish this processor's setup
 }

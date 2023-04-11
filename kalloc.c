@@ -77,7 +77,7 @@ kfree(char *v)
 }
 
 void
-kfree_lru_swap(struct proc* p, char *v)
+klru_free_swap(struct proc* p, char *v)
 {
   struct run *r;
   if((uint)v % PGSIZE || v < end || V2P(v) >= PHYSTOP)
@@ -91,7 +91,7 @@ kfree_lru_swap(struct proc* p, char *v)
   r = (struct run*)v;
   r->next = kmem.freelist;
   kmem.freelist = r;
-  free_lru_frame(p, (int)v);
+  lru_free_frame(p, (int)v);
   if(kmem.use_lock)
     release(&kmem.lock);
 }

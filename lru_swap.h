@@ -28,10 +28,10 @@ struct frame{
 };
 
 struct disk_frame{
-    int pid;
     int vaddr;
     int index;
     int next;
+    int count;
 };
 
 struct{

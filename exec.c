@@ -101,9 +101,7 @@ exec(char *path, char **argv)
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = PGROUNDUP(curproc->cdb_size) + PGSIZE + sp;
   switchuvm(curproc);
-  free_lru(curproc->pid);
-  free_swap(curproc->pid);
-  curproc->swap_list = 0;
+  // cprintf("Swap Out From Exec\n");
   if(swap_out(curproc, sz-PGSIZE, 0) < 0)
   {
     panic("Swap Space is Full");
@@ -114,9 +112,8 @@ exec(char *path, char **argv)
  bad:
   if(pgdir)
   {
-    free_lru(curproc->pid);
-    free_swap(curproc->pid);
-    curproc->swap_list = 0;
+    lru_free(curproc->pid);
+    swap_free(curproc->pid);
     freevm(pgdir);
   }
   if(ip)

@@ -164,6 +164,9 @@ growproc(int n)
   struct proc *curproc = myproc();
 
   sz = curproc->sz;
+  if (n == 0){
+    return 0;
+  }
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n, 0)) == 0)
       return -1;
@@ -171,7 +174,7 @@ growproc(int n)
     for (i = 0 ; i < pages ; i++)
     {
       memset(curproc->buffer, 0 , PGSIZE);
-
+      // cprintf("Swap Out From Grow Proc\n");
       if(swap_out(curproc, curproc->sz + i*PGSIZE, 0) < 0)
       {
         return -1;
@@ -196,6 +199,7 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *curproc = myproc();
+  // cprintf("Forking!\n");
   curproc->forked = 1;
 
   // Allocate process.
@@ -221,9 +225,12 @@ fork(void)
       np->ofile[i] = filedup(curproc->ofile[i]);
   np->cwd = idup(curproc->cwd);
   np->forked = 0;
+  curproc->forked = 1;
 
   //Error here due to which user tests are failing.
   np->swap_list = curproc->swap_list;
+  swap_fork(curproc);
+
 
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
@@ -306,8 +313,8 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        free_lru(p->pid);
-        free_swap(p->pid);
+        lru_free(p->pid);
+        swap_free(p->pid);
         freevm(p->pgdir);
         p->pid = 0;
         p->parent = 0;

@@ -337,7 +337,7 @@ copyuvm(struct proc* old, struct proc* new)
       memmove(mem, (char*)P2V(pa), PGSIZE);
       if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags, 1) < 0) 
       {
-        kfree_lru_swap(new, mem);
+        klru_free_swap(new, mem);
         goto bad;
       }
     }
@@ -345,8 +345,8 @@ copyuvm(struct proc* old, struct proc* new)
   return d;
 
 bad:
-  free_lru(new->pid);
-  free_swap(new->pid);
+  lru_free(new->pid);
+  swap_free(new->pid);
   freevm(d);
   return 0;
 }

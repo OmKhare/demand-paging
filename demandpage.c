@@ -22,7 +22,7 @@ void pgflt_handler()
     uint i, off;
     char* mem;
     uint pgflt_addr = PGROUNDDOWN(rcr2());
-    cprintf("Page Fault Occoured for Vaddr : %d\n", pgflt_addr);
+    // cprintf("Page Fault Occoured for Vaddr : %d\n", pgflt_addr);
     if (pgflt_addr > KERNBASE)
     {
         panic("Over the KERNBASE!");
