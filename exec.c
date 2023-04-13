@@ -7,6 +7,8 @@
 #include "x86.h"
 #include "elf.h"
 
+extern int (*swapfunc_ptr_arr[])(struct proc*, int);
+
 int
 exec(char *path, char **argv)
 {
@@ -106,7 +108,7 @@ exec(char *path, char **argv)
   curproc->tf->esp = PGROUNDUP(curproc->cdb_size) + PGSIZE + sp;
   switchuvm(curproc);
   // cprintf("Swap Out From Exec\n");
-  if(swap_out(curproc, sz-PGSIZE, 0) < 0)
+  if(swapfunc_ptr_arr[1](curproc, sz-PGSIZE) < 0)
   {
     panic("Swap Space is Full");
   }

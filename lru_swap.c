@@ -23,6 +23,9 @@ Includes implementation of the functions to handle a doubly circular list.
 /*
     Wont need any locks.
 */
+
+int (*swapfunc_ptr_arr[])(struct proc*, int) = {swap_in, swap_out};
+
 void lru_swap_init()
 {
     for (int i = 0; i < MAX_FRAME_LRU_SWAP; i++)
@@ -85,6 +88,48 @@ int lru_insert(int pid, int vaddr) // DONE
     return 0;
 }
 
+void lru_free_frame(int pid, int vaddr)
+{
+    if (lru.head == 0)
+    {
+        return;
+    }
+    struct frame *curr, *prev;
+    int index;
+    curr = lru.head;
+    prev = 0;
+    acquire(&lru.lk);
+    while (curr->pid != pid || curr->vaddr != vaddr)
+    {
+        prev = curr;
+        if (curr->next == lru.head)
+        {
+            break;
+        }
+        curr = curr->next;
+    }
+    if (curr->pid == pid && curr->vaddr == vaddr) {
+        if (curr == lru.head)
+        {
+            lru.head = lru.head->next;
+        }
+
+        if (curr == lru.head && prev != 0)
+        {
+            prev->next = lru.head;
+            lru.head->prev = prev;
+        }
+        else
+        {
+            curr->prev->next = curr->next;
+            curr->next->prev = curr->prev;
+        }
+        index = curr - lru.lru_frame_list;
+        bitmap.frame_bitmap[index] = -1;
+    }
+    release(&lru.lk);
+}
+
 int lru_delete()
 {
     int index;
@@ -138,47 +183,6 @@ void lru_delete_frame(int index)
     Free the lru doubly linked list for a PID and set the index 
     for it to be zero set the bit map to -1
 */
-void lru_free_frame(int pid, int vaddr) //DONE
-{
-    if (lru.head == 0)
-    {
-        return;
-    }
-    struct frame *curr, *prev;
-    int index;
-    curr = lru.head;
-    prev = 0;
-    acquire(&lru.lk);
-    while (curr->pid != pid || curr->vaddr != vaddr)
-    {
-        prev = curr;
-        if (curr->next == lru.head)
-        {
-            break;
-        }
-        curr = curr->next;
-    }
-    if (curr->pid == pid && curr->vaddr == vaddr) {
-        if (curr == lru.head)
-        {
-            lru.head = lru.head->next;
-        }
-
-        if (curr == lru.head && prev != 0)
-        {
-            prev->next = lru.head;
-            lru.head->prev = prev;
-        }
-        else
-        {
-            curr->prev->next = curr->next;
-            curr->next->prev = curr->prev;
-        }
-        index = curr - lru.lru_frame_list;
-        bitmap.frame_bitmap[index] = -1;
-    }
-    release(&lru.lk);
-}
 
 void lru_free(int pid) //DONE
 {
@@ -219,7 +223,7 @@ void lru_read()
 {
     struct frame *curr = lru.head;
     if (lru.head == 0){
-        cprintf("Empty Lsit!\n");
+        cprintf("Empty List!\n");
         return;
     }
     cprintf("PID : %d | Index : %ld | Vaddr : %d\n", curr->pid, curr - lru.lru_frame_list, curr->vaddr);
@@ -270,7 +274,7 @@ int swap_get_free_frame()
     No changes related to lru pages done here done here.
 */
 
-int swap_out(struct proc* p, int vaddr, int kfree_flag)
+int swap_out(struct proc* p, int vaddr)
 {
     // cprintf("Swapping out for PID : %d | vaddr : %d\n", p->pid, vaddr);
     int findex;
@@ -289,12 +293,8 @@ int swap_out(struct proc* p, int vaddr, int kfree_flag)
         swap.swap_frame_list[findex].count = 1;
         release(&swap.lk);
         writeswap(p, ROOTDEV, SWAP_START+findex*8);
-        cprintf("kf called from swap_out\n");
         demappages_swap_out(p, vaddr);
-        if (kfree_flag)
-            klru_free_swap(p, (char *)vaddr);
-        else
-            lru_free_frame(p->pid, vaddr);
+        klru_free_swap(p, (char *)vaddr);
         return 1;
     }
     // cprintf("Hello Check\n");
@@ -316,10 +316,7 @@ int swap_out(struct proc* p, int vaddr, int kfree_flag)
     //Updated Page Directory
     //Should Not be present here.
     demappages_swap_out(p, vaddr);
-    if (kfree_flag)
-        klru_free_swap(p, (char *)vaddr);
-    else
-        lru_free_frame(p->pid, vaddr);
+    klru_free_swap(p, (char *)vaddr);
     return 1;
 }
 
@@ -526,7 +523,7 @@ void get_lru(int pid, int vaddr)
         else
         {
             // cprintf("Swap Out From Swap Out\n");
-            if(swap_out(pr, vaddr_lru, 1) < 0)
+            if(swapfunc_ptr_arr[1](pr, vaddr_lru) < 0)
             {
                 panic("Swap Space is Full");
             }

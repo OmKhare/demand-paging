@@ -81,8 +81,10 @@ klru_free_swap(struct proc* p, char *v)
 {
   struct run *r;
   if((uint)v % PGSIZE || v < end || V2P(v) >= PHYSTOP)
-    panic("kfree");
-
+  {
+    lru_free_frame(p->pid, (int)v);
+    return;
+  }
   // Fill with junk to catch dangling refs.
   memset(v, 1, PGSIZE);
 
@@ -91,7 +93,6 @@ klru_free_swap(struct proc* p, char *v)
   r = (struct run*)v;
   r->next = kmem.freelist;
   kmem.freelist = r;
-  lru_free_frame(p->pid, (int)v);
   if(kmem.use_lock)
     release(&kmem.lock);
 }

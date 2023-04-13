@@ -12,6 +12,8 @@
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #endif
 
+extern int (*swapfunc_ptr_arr[])(struct proc*, int);
+
 void pgflt_handler()
 {
 
@@ -45,7 +47,7 @@ void pgflt_handler()
         get_lru(curproc->pid, pgflt_addr);
         if (swap_check(curproc, pgflt_addr) == 0){
             //Handle the reading from the swap and returning here.
-            if (swap_in(curproc, pgflt_addr) < 0)
+            if (swapfunc_ptr_arr[0](curproc, pgflt_addr) < 0)
             {
                 panic("Swap In not working!");
             }

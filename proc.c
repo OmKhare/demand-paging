@@ -8,6 +8,8 @@
 #include "spinlock.h"
 #include "elf.h"
 
+extern int (*swapfunc_ptr_arr[])(struct proc*, int);
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -175,7 +177,7 @@ growproc(int n)
     {
       memset(curproc->buffer, 0 , PGSIZE);
       // cprintf("Swap Out From Grow Proc\n");
-      if(swap_out(curproc, curproc->sz + i*PGSIZE, 0) < 0)
+      if(swapfunc_ptr_arr[1](curproc, curproc->sz + i*PGSIZE) < 0)
       {
         return -1;
       }
