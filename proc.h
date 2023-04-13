@@ -32,6 +32,13 @@ struct context {
   uint eip;
 };
 
+struct ph_info{
+  int filesz;
+  int memsz;
+  int vaddr;
+  int off;
+};
+
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
@@ -51,6 +58,7 @@ struct proc {
   char name[16];               // Process name
   char path[512];              // Path of the current Process.
   uint cdb_size;               // Size of the program after only loading the Code+Data+bss
+  struct ph_info ph[2];
   struct disk_frame* swap_list;
   int forked;
   char buffer[PGSIZE];

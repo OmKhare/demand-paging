@@ -52,6 +52,10 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
+    curproc->ph->filesz = ph.filesz;
+    curproc->ph->memsz = ph.memsz;
+    curproc->ph->off = ph.off;
+    curproc->ph->vaddr = ph.vaddr;
     if ((sz = allocuvm(pgdir, sz, ph.vaddr + ph.memsz, 0)) == 0)
       goto bad;
   }

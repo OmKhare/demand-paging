@@ -16,10 +16,8 @@ void pgflt_handler()
 {
 
     struct proc *curproc = myproc();
-    struct elfhdr elf;
     struct inode *ip;
-    struct proghdr ph;
-    uint i, off;
+    uint i;
     char* mem;
     uint pgflt_addr = PGROUNDDOWN(rcr2());
     // cprintf("Page Fault Occoured for Vaddr : %d\n", pgflt_addr);
@@ -45,8 +43,7 @@ void pgflt_handler()
             Stack and Heap to be thought off afterwards.
         */
         get_lru(curproc->pid, pgflt_addr);
-        if (swap_check(curproc, pgflt_addr) == 0)
-        {
+        if (swap_check(curproc, pgflt_addr) == 0){
             //Handle the reading from the swap and returning here.
             if (swap_in(curproc, pgflt_addr) < 0)
             {
@@ -55,49 +52,38 @@ void pgflt_handler()
             return;
         }
 
-        if ((mem = kalloc(curproc->pid, 1)) == 0)
-        {
+        if ((mem = kalloc(curproc->pid, 1)) == 0){
             panic("No Free Page");
         }
         if (mappages(curproc->pgdir, (char*)pgflt_addr, PGSIZE, V2P(mem), PTE_W | PTE_U | PTE_P, 1) < 0)
             panic("Error in Mappages");
         if ((ip = namei(curproc->path)) == 0)
             panic("namei error");
-        ilock(ip);
-        if (readi(ip, (char *)&elf, 0, sizeof(elf)) != sizeof(elf))
-            panic("readi error");
-        if (elf.magic != ELF_MAGIC)
-            panic("elf magic error");
-        for (i = 0, off = elf.phoff; i < elf.phnum; i++, off += sizeof(ph))
-        {
-            if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
-                panic("readi error");
-            if (ph.vaddr <= pgflt_addr && pgflt_addr <= ph.vaddr + ph.memsz)
+        for (i = 0; i < 2; i++){
+            if (curproc->ph->vaddr <= pgflt_addr && pgflt_addr <= curproc->ph->vaddr + curproc->ph->memsz)
             {
                 //Entire section of the code only present
-                if (ph.vaddr + ph.filesz >= pgflt_addr + PGSIZE)
-                    loaduvm(curproc->pgdir, (char *)(ph.vaddr + pgflt_addr), ip, ph.off + pgflt_addr, PGSIZE);
+                if (curproc->ph->vaddr + curproc->ph->filesz >= pgflt_addr + PGSIZE)
+                    loaduvm(curproc->pgdir, (char *)(curproc->ph->vaddr + pgflt_addr), ip, curproc->ph->off + pgflt_addr, PGSIZE);
                 else
                 {
                     //Two cases possible.
                     //If the section is for bss section completly.
-                    if (pgflt_addr >= ph.filesz)
+                    if (pgflt_addr >= curproc->ph->filesz)
                     {
-                        if (pgflt_addr + PGSIZE <= ph.memsz)
+                        if (pgflt_addr + PGSIZE <= curproc->ph->memsz)
                             stosb(mem, 0, PGSIZE);
                         else
-                            stosb(mem, 0, ph.memsz - pgflt_addr);
+                            stosb(mem, 0, curproc->ph->memsz - pgflt_addr);
                     }
                     else
                     //If the section overlaps bss as well as code+data
                     {   
-                        loaduvm(curproc->pgdir, (char *)(ph.vaddr + pgflt_addr), ip, ph.off + pgflt_addr, ph.filesz - pgflt_addr);
-                        stosb(mem + (ph.filesz - pgflt_addr), 0, PGSIZE- ( ph.filesz - pgflt_addr));
-                        ip = namei(curproc->path);
+                        loaduvm(curproc->pgdir, (char *)(curproc->ph->vaddr + pgflt_addr), ip, curproc->ph->off + pgflt_addr, curproc->ph->filesz - pgflt_addr);
+                        stosb(mem + (curproc->ph->filesz - pgflt_addr), 0, PGSIZE- ( curproc->ph->filesz - pgflt_addr));
                     }
                 }
             }
         }
-        iunlockput(ip);
     }
 }
