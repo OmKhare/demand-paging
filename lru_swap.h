@@ -11,25 +11,15 @@ all the pages being swapped out of the system.
 #define MAX_FRAME_LRU_SWAP 2560
 //2560 Number can be managed as per the actual pages present in the system.
 
-
-#define FRAME_VALID       1     //Is working. Wither in lru or in swap.
-#define FRAME_INVALID    -1     //Is not working wither side.
-#define FRAME_PHASED      0     //Is in transition phase from one to another.
-
-#define SWAP_DISK 1
-#define SWAP_ELF 0
-
 struct frame{
     int pid;
     int vaddr;
-    int index;
     struct frame* next;
     struct frame* prev;
 };
 
 struct disk_frame{
     int vaddr;
-    int index;
     int next;
     int count;
 };

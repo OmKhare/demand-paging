@@ -91,7 +91,7 @@ klru_free_swap(struct proc* p, char *v)
   r = (struct run*)v;
   r->next = kmem.freelist;
   kmem.freelist = r;
-  lru_free_frame(p, (int)v);
+  lru_free_frame(p->pid, (int)v);
   if(kmem.use_lock)
     release(&kmem.lock);
 }
@@ -99,32 +99,18 @@ klru_free_swap(struct proc* p, char *v)
 // Allocate one 4096-byte page of physical memory.
 // Returns a pointer that the kernel can use.
 // Returns 0 if the memory cannot be allocated.
-char*
-kalloc(void)
+char* kalloc(int pid, int lru)
 {
   struct run *r;
 
   if(kmem.use_lock)
     acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
+  if(r){
     kmem.freelist = r->next;
-  if(kmem.use_lock)
-    release(&kmem.lock);
-  return (char*)r;
-}
-
-char* kalloc_lru_swap(struct proc* p)
-{
-  struct run *r;
-
-  if(kmem.use_lock)
-    acquire(&kmem.lock);
-  r = kmem.freelist;
-  if(r)
-  {
-    kmem.freelist = r->next;
-    get_lru(p->pid, (uint)r);
+    if (pid != -1 && lru == 1){
+      get_lru(pid, (uint)r);
+    }
   }
   if(kmem.use_lock)
     release(&kmem.lock);

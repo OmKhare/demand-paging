@@ -55,7 +55,7 @@ void pgflt_handler()
             return;
         }
 
-        if ((mem = kalloc_lru_swap(curproc)) == 0)
+        if ((mem = kalloc(curproc->pid, 1)) == 0)
         {
             panic("No Free Page");
         }

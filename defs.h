@@ -43,6 +43,8 @@ int             filewrite(struct file*, char*, int n);
 
 // fs.c
 void            readsb(int dev, struct superblock *sb);
+void            readswap(struct proc *, int , int);
+void            writeswap(struct proc *, int , int);
 int             dirlink(struct inode*, char*, uint);
 struct inode*   dirlookup(struct inode*, char*, uint*);
 struct inode*   ialloc(uint, short);
@@ -71,9 +73,8 @@ extern uchar    ioapicid;
 void            ioapicinit(void);
 
 // kalloc.c
-char*           kalloc(void);
-char*           kalloc_lru_swap(struct proc*);
-void            kfree(char*);
+char*           kalloc(int, int);
+void            kfree(char *);
 void            klru_free_swap(struct proc*, char *);
 void            kinit1(void*, void*);
 void            kinit2(void*, void*);
@@ -101,7 +102,7 @@ void            lru_swap_init();
 int             lru_insert(int pid, int vaddr);
 void            lru_delete_frame(int index);
 int             lru_delete();
-void            lru_free_frame(struct proc* p, int vaddr);
+void            lru_free_frame(int pid, int vaddr);
 void            lru_free(int pid);
 int             lru_get_pid_frame(int index);
 int             lru_get_vaddr_frame(int index);
@@ -217,6 +218,8 @@ void            switchkvm(void);
 pte_t*          walkpgdir(pde_t *, const void *, int);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
+int             mappages_swap_in(struct proc* p, int vaddr);
+int             demappages_swap_out(struct proc *p, int vaddr);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

@@ -42,7 +42,7 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
   if(*pde & PTE_P){
     pgtab = (pte_t*)P2V(PTE_ADDR(*pde));
   } else {
-    if(!alloc || (pgtab = (pte_t*)kalloc()) == 0)
+    if(!alloc || (pgtab = (pte_t*)kalloc(-1, 0)) == 0)
       return 0;
     // Make sure all those PTE_P bits are zero.
     memset(pgtab, 0, PGSIZE);
@@ -121,7 +121,7 @@ setupkvm(void)
   pde_t *pgdir;
   struct kmap *k;
 
-  if((pgdir = (pde_t*)kalloc()) == 0)
+  if((pgdir = (pde_t*)kalloc(-1, 0)) == 0)
     return 0;
   memset(pgdir, 0, PGSIZE);
   if (P2V(PHYSTOP) > (void*)DEVSPACE)
@@ -186,7 +186,7 @@ inituvm(pde_t *pgdir, char *init, uint sz)
 
   if(sz >= PGSIZE)
     panic("inituvm: more than a page");
-  mem = kalloc();
+  mem = kalloc(-1, 0);
   memset(mem, 0, PGSIZE);
   mappages(pgdir, 0, PGSIZE, V2P(mem), PTE_W|PTE_U, 1);
   memmove(mem, init, sz);
@@ -233,7 +233,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz, uint setpte)
   a = PGROUNDUP(oldsz);
   for(; a < newsz; a += PGSIZE){
     if (setpte == 1){
-      mem = kalloc_lru_swap(p);
+      mem = kalloc(p->pid, 1);
       memset(mem, 0, PGSIZE);
     }
     if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U, setpte) < 0){
@@ -330,7 +330,7 @@ copyuvm(struct proc* old, struct proc* new)
     }
     else
     {
-      if((mem = kalloc_lru_swap(new)) == 0)
+      if((mem = kalloc(new->pid, 0)) == 0)
         goto bad;
       pa = PTE_ADDR(*pte);
       flags = PTE_FLAGS(*pte);
@@ -392,10 +392,33 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
   return 0;
 }
 
-//PAGEBREAK!
-// Blank page.
-//PAGEBREAK!
-// Blank page.
-//PAGEBREAK!
-// Blank page.
+int mappages_swap_in(struct proc *p, int vaddr)
+{
+  char *mem;
+  if ((mem = kalloc(p->pid, 1)) == 0)
+  {
+    panic("No Free Page");
+  }
+  memmove(mem, p->buffer, PGSIZE);
+  if (mappages(p->pgdir, (char *)vaddr, PGSIZE, V2P(mem), PTE_W | PTE_U | PTE_P, 1) < 0)
+    return -1;
+  return 0;
+}
 
+int demappages_swap_out(struct proc *p, int vaddr){
+  pte_t *pte;
+  uint pa;
+  if((pte = walkpgdir(p->pgdir, (char *)vaddr, 0)) == 0)
+    panic("address should exist");
+  pa = PTE_ADDR(*pte);
+  if(mappages(p->pgdir, (char *)vaddr, PGSIZE, pa, PTE_W | PTE_U, 0) < 0)
+      panic("Map pages failed");
+  return 0;
+}
+
+// PAGEBREAK!
+//  Blank page.
+// PAGEBREAK!
+//  Blank page.
+// PAGEBREAK!
+//  Blank page.

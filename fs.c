@@ -38,6 +38,33 @@ readsb(int dev, struct superblock *sb)
   brelse(bp);
 }
 
+void 
+readswap(struct proc *p, int dev, int bno)
+{
+  int i;
+  struct buf *buffer;
+  for (i = 0; i < 8; i++)
+  {
+    buffer = bread(dev, bno + i);
+    memmove(p->buffer + BSIZE * i, buffer->data, BSIZE);
+    brelse(buffer);
+  }
+}
+
+void 
+writeswap(struct proc *p, int dev, int bno)
+{
+  int i;
+  struct buf *buffer;
+  for (i = 0; i < 8; i++)
+  {
+    buffer = bget(dev, bno + i);
+    memmove(buffer->data, p->buffer + BSIZE * i, BSIZE);
+    bwrite(buffer);
+    brelse(buffer);
+  }
+}
+
 // Zero a block.
 static void
 bzero(int dev, int bno)
