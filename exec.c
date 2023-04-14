@@ -26,6 +26,7 @@ exec(char *path, char **argv)
     return -1;
   }
   ilock(ip);
+  getinode(curproc, ip);
   pgdir = 0;
 
   // Check ELF header

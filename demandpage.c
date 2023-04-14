@@ -59,8 +59,8 @@ void pgflt_handler()
         }
         if (mappages(curproc->pgdir, (char*)pgflt_addr, PGSIZE, V2P(mem), PTE_W | PTE_U | PTE_P, 1) < 0)
             panic("Error in Mappages");
-        if ((ip = namei(curproc->path)) == 0)
-            panic("namei error");
+        if((ip = iget(curproc->ip.dev, curproc->ip.inum)) == 0)
+            panic("iget error");
         for (i = 0; i < 2; i++){
             if (curproc->ph->vaddr <= pgflt_addr && pgflt_addr <= curproc->ph->vaddr + curproc->ph->memsz)
             {

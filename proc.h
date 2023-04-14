@@ -39,6 +39,11 @@ struct ph_info{
   int off;
 };
 
+struct inode_info{
+  int dev;
+  int inum;
+};
+
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
@@ -59,6 +64,7 @@ struct proc {
   char path[512];              // Path of the current Process.
   uint cdb_size;               // Size of the program after only loading the Code+Data+bss
   struct ph_info ph[2];
+  struct inode_info ip;
   struct disk_frame* swap_list;
   int forked;
   char buffer[PGSIZE];
