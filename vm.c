@@ -68,8 +68,6 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm, int set_pte)
   for(;;){
     if((pte = walkpgdir(pgdir, a, 1)) == 0)
       return -1;
-    if(*pte & PTE_P)
-      panic("remap");
     *pte = pa | perm | set_pte;
     if(a == last)
       break;
@@ -233,8 +231,13 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz, uint setpte)
   a = PGROUNDUP(oldsz);
   for(; a < newsz; a += PGSIZE){
     if (setpte == 1){
-      mem = kalloc(p->pid, 1);
-      memset(mem, 0, PGSIZE);
+      if (a > p->cdb_size){
+        mem = kalloc(p->pid, a);
+        memset(mem, 0, PGSIZE);
+      }else{
+        mem = kalloc(p->pid, -1);
+        memset(mem, 0, PGSIZE);
+      }
     }
     if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U, setpte) < 0){
       cprintf("allocuvm out of memory (2)\n");
@@ -330,8 +333,13 @@ copyuvm(struct proc* old, struct proc* new)
     }
     else
     {
-      if((mem = kalloc(new->pid, 0)) == 0)
-        goto bad;
+      if (i > old->cdb_size){
+        if((mem = kalloc(new->pid, i)) == 0)
+          goto bad;
+      }else{
+        if((mem = kalloc(new->pid, -1)) == 0)
+          goto bad;
+      }
       pa = PTE_ADDR(*pte);
       flags = PTE_FLAGS(*pte);
       memmove(mem, (char*)P2V(pa), PGSIZE);
@@ -395,7 +403,7 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 int mappages_swap_in(struct proc *p, int vaddr)
 {
   char *mem;
-  if ((mem = kalloc(p->pid, 1)) == 0)
+  if ((mem = kalloc(p->pid, -1)) == 0)
   {
     panic("No Free Page");
   }
@@ -416,6 +424,14 @@ int demappages_swap_out(struct proc *p, int vaddr){
   return 0;
 }
 
+void read_vaddr(struct proc* p, int vaddr){
+  pte_t *pte;
+  int pa = 0;
+  if((pte = walkpgdir(p->pgdir, (void *)vaddr, 0)) == 0)
+      panic("copyuvm: pte should exist");
+  pa = PTE_ADDR(*pte);
+  memmove(p->buffer, (char*)P2V(pa), PGSIZE);
+}
 // PAGEBREAK!
 //  Blank page.
 // PAGEBREAK!

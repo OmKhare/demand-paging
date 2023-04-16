@@ -217,6 +217,7 @@ int             loaduvm(pde_t*, char*, struct inode*, uint, uint);
 pde_t*          copyuvm(struct proc*, struct proc*);
 void            switchuvm(struct proc*);
 void            switchkvm(void);
+void            read_vaddr(struct proc*, int);
 pte_t*          walkpgdir(pde_t *, const void *, int);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);

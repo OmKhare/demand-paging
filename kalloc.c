@@ -109,8 +109,8 @@ char* kalloc(int pid, int lru)
   r = kmem.freelist;
   if(r){
     kmem.freelist = r->next;
-    if (pid != -1 && lru == 1){
-      get_lru(pid, (uint)r);
+    if (pid != -1 && lru != -1){
+      get_lru(pid, (uint)lru);
     }
   }
   if(kmem.use_lock)
