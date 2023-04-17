@@ -67,7 +67,8 @@ struct proc {
   struct inode_info ip;
   struct disk_frame* swap_list;
   int forked;
-  char buffer[PGSIZE];
+  char read_buffer[PGSIZE];
+  char write_buffer[PGSIZE];
 };
 
 // Process memory is laid out contiguously, low addresses first:

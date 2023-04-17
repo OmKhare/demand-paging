@@ -175,7 +175,7 @@ growproc(int n)
     pages = (PGROUNDUP(sz) - PGROUNDUP(curproc->sz))/PGSIZE;
     for (i = 0 ; i < pages ; i++)
     {
-      memset(curproc->buffer, 0 , PGSIZE);
+      memset(curproc->write_buffer, 0 , PGSIZE);
       cprintf("Swap Out to Grow Heap of the Process with PID %d\n", curproc->pid);
       if(swapfunc_ptr_arr[1](curproc, curproc->sz + i*PGSIZE) < 0)
       {

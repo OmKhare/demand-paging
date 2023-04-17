@@ -82,7 +82,7 @@ exec(char *path, char **argv)
     if(argc >= MAXARG)
       goto bad;
     sp = (sp - (strlen(argv[argc]) + 1)) & ~3;
-    safestrcpy(&(curproc->buffer[sp]), argv[argc], strlen(argv[argc]) + 1);
+    safestrcpy(&(curproc->write_buffer[sp]), argv[argc], strlen(argv[argc]) + 1);
     ustack[3+argc] = PGROUNDUP(curproc->cdb_size) + PGSIZE + sp; 
   }
   ustack[3+argc] = 0;
@@ -92,7 +92,7 @@ exec(char *path, char **argv)
   ustack[2] =  PGROUNDUP(curproc->cdb_size) + PGSIZE + (sp - (argc+1)*4);  // argv pointer
 
   sp -= (3+argc+1) * 4;
-  memmove(curproc->buffer + sp, ustack, (3+argc+1)*4);
+  memmove(curproc->write_buffer + sp, ustack, (3+argc+1)*4);
 
   //Adding Path as well as Name.
   safestrcpy(curproc->path, path, strlen(path)+1);

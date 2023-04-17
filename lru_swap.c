@@ -28,9 +28,12 @@ int (*swapfunc_ptr_arr[])(struct proc*, int) = {swap_in, swap_out};
 
 void lru_swap_init()
 {
-    for (int i = 0; i < MAX_FRAME_LRU_SWAP; i++)
+    for (int i = 0; i < MAX_FRAME_LRU; i++)
     {
         bitmap.frame_bitmap[i] = -1;
+    }
+    for (int i = 0; i < MAX_FRAME_SWAP; i++)
+    {
         swap_bitmap.frame_bitmap[i] = -1;
     }
     initlock(&lru.lk, "lru");
@@ -39,7 +42,7 @@ void lru_swap_init()
 
 int get_free_frame_lru()
 {
-    for (int i = 0; i < MAX_FRAME_LRU_SWAP; i++)
+    for (int i = 0; i < MAX_FRAME_LRU; i++)
     {
         if (bitmap.frame_bitmap[i] == -1)
         {   
@@ -148,7 +151,6 @@ int lru_delete()
         index = lru.head - lru.lru_frame_list;
         lru.head->next = 0;
         lru.head->prev = 0;
-        bitmap.frame_bitmap[index] = 0;
     }
     else
     {
@@ -159,19 +161,21 @@ int lru_delete()
         lru.head = lru.head->next;
         head->next = 0;
         head->prev = 0;
-        bitmap.frame_bitmap[index] = 0;
     }
-    release(&lru.lk);
     return index;
 }
 
 int lru_get_pid_frame(int index)
 {
+    if (!holding(&lru.lk))
+        panic("Not Holding Lock\n");
     return lru.lru_frame_list[index].pid;
 }
 
 int lru_get_vaddr_frame(int index)
 {
+    if (!holding(&lru.lk))
+        panic("Not Holding Lock\n");
     return lru.lru_frame_list[index].vaddr;
 }
 
@@ -182,6 +186,7 @@ int lru_get_vaddr_frame(int index)
 void lru_delete_frame(int index)
 {
     bitmap.frame_bitmap[index] = -1;
+    release(&lru.lk);
 }
 
 /*
@@ -262,7 +267,7 @@ void lru_read()
 
 int swap_get_free_frame()
 {
-    for (int i = 0 ; i < MAX_FRAME_LRU_SWAP ; i++)
+    for (int i = 0 ; i < MAX_FRAME_SWAP ; i++)
     {
         if (swap_bitmap.frame_bitmap[i] == -1)
         {
@@ -511,8 +516,9 @@ void get_lru(int pid, int vaddr)
 {
     int index, vaddr_lru, pid_lru;
     struct proc* pr;
-    while (lru_insert(pid, vaddr) < 0)
+    if (lru_insert(pid, vaddr) < 0)
     {   
+        cprintf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
         if ((index = lru_delete()) < 0)
         {
             panic("LRU full as well as empty.");
@@ -524,6 +530,7 @@ void get_lru(int pid, int vaddr)
         {
             lru_free(pid_lru);
             swap_free(pid_lru);
+            lru_insert(pid, vaddr);
         }
         else
         {
@@ -533,6 +540,7 @@ void get_lru(int pid, int vaddr)
             {
                 panic("Swap Space is Full");
             }
+            lru_insert(pid, vaddr);
         }
 
     }

@@ -46,7 +46,7 @@ readswap(struct proc *p, int dev, int bno)
   for (i = 0; i < 8; i++)
   {
     buffer = bread(dev, bno + i);
-    memmove(p->buffer + BSIZE * i, buffer->data, BSIZE);
+    memmove(p->read_buffer + BSIZE * i, buffer->data, BSIZE);
     brelse(buffer);
   }
 }
@@ -59,7 +59,7 @@ writeswap(struct proc *p, int dev, int bno)
   for (i = 0; i < 8; i++)
   {
     buffer = bget(dev, bno + i);
-    memmove(buffer->data, p->buffer + BSIZE * i, BSIZE);
+    memmove(buffer->data, p->write_buffer + BSIZE * i, BSIZE);
     bwrite(buffer);
     brelse(buffer);
   }
