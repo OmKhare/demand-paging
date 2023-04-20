@@ -108,7 +108,6 @@ exec(char *path, char **argv)
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = PGROUNDUP(curproc->cdb_size) + PGSIZE + sp;
   switchuvm(curproc);
-  cprintf("Swap Out Stack PID : %d and vaddr : %d\n", curproc->pid, sz-PGSIZE);
   if(swapfunc_ptr_arr[1][0](curproc, sz-PGSIZE) < 0)
   {
     panic("Swap Space is Full");

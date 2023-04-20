@@ -60,7 +60,6 @@ int get_free_frame_lru()
 
 int lru_insert(int pid, int vaddr) // DONE
 {
-    cprintf("Insert LRU for PID %d and vaddr %d\n", pid, vaddr);
     int index;
     if (lru.head == 0)
     {
@@ -77,7 +76,6 @@ int lru_insert(int pid, int vaddr) // DONE
         lru.head = &(lru.lru_frame_list[index]);
         bitmap.frame_bitmap[index] = 1;
         release(&lru.lk);
-        lru_read();
         return 0;
     }
     struct frame *last = lru.head->prev;
@@ -96,13 +94,11 @@ int lru_insert(int pid, int vaddr) // DONE
     last->next = &(lru.lru_frame_list[index]);
     bitmap.frame_bitmap[index] = 1;
     release(&lru.lk);
-    lru_read();
     return 0;
 }
 
 void lru_free_frame(int pid, int vaddr)
 {
-    cprintf("Delete LRU for PID %d and vaddr %d\n", pid, vaddr);
     if (lru.head == 0)
     {
         return;
@@ -140,7 +136,6 @@ void lru_free_frame(int pid, int vaddr)
         index = curr - lru.lru_frame_list;
         bitmap.frame_bitmap[index] = -1;
     }
-    lru_read();
     release(&lru.lk);
 }
 
@@ -209,7 +204,6 @@ void lru_free(int pid) //DONE
     int flag = 0;
     struct frame *curr = lru.head;
     acquire(&lru.lk);
-    cprintf("Loop\n");
     do
     {
         flag = 0;
@@ -294,7 +288,6 @@ int swap_get_free_frame()
 */
 int swap_out(struct proc* p, int vaddr)
 {
-    cprintf("Swapping out for PID : %d | vaddr : %d\n", p->pid, vaddr);
     int findex;
     struct disk_frame* curr = p->swap_list;
     if (p->swap_list == 0)
@@ -313,7 +306,6 @@ int swap_out(struct proc* p, int vaddr)
         writeswap(p->write_buffer, ROOTDEV, SWAP1_START +findex*8);
         demappages_swap_out(p, vaddr);
         klru_free_swap(p, (char *)vaddr);
-        swap_read(p);
         return 1;
     }
     while (curr->next != -1)
@@ -334,13 +326,11 @@ int swap_out(struct proc* p, int vaddr)
     writeswap(p->write_buffer, ROOTDEV, SWAP1_START+findex*8);
     demappages_swap_out(p, vaddr);
     klru_free_swap(p, (char *)vaddr);
-    swap_read(p);
     return 1;
 }
 
 int swap_out_stack(struct proc* p, int vaddr)
 {
-    cprintf("Swapping out for PID : %d | vaddr : %d\n", p->pid, vaddr);
     int findex;
     struct disk_frame* curr = p->swap_list;
     if (p->swap_list == 0)
@@ -359,7 +349,6 @@ int swap_out_stack(struct proc* p, int vaddr)
         writeswap(p->stack_buffer, ROOTDEV, SWAP2_START+findex*8);
         demappages_swap_out(p, vaddr);
         klru_free_swap(p, (char *)vaddr);
-        swap_read(p);
         return 1;
     }
     while (curr->next != -1)
@@ -380,13 +369,11 @@ int swap_out_stack(struct proc* p, int vaddr)
     writeswap(p->stack_buffer, ROOTDEV, SWAP2_START+findex*8);
     demappages_swap_out(p, vaddr);
     klru_free_swap(p, (char *)vaddr);
-    swap_read(p);
     return 1;
 }
 
 int swap_out_heap(struct proc* p, int vaddr)
 {
-    cprintf("Swapping out for PID : %d | vaddr : %d\n", p->pid, vaddr);
     int findex;
     struct disk_frame* curr = p->swap_list;
     if (p->swap_list == 0)
@@ -405,7 +392,6 @@ int swap_out_heap(struct proc* p, int vaddr)
         writeswap(p->heap_buffer, ROOTDEV, SWAP3_START+findex*8);
         demappages_swap_out(p, vaddr);
         klru_free_swap(p, (char *)vaddr);
-        swap_read(p);
         return 1;
     }
     while (curr->next != -1)
@@ -426,7 +412,6 @@ int swap_out_heap(struct proc* p, int vaddr)
     writeswap(p->heap_buffer, ROOTDEV, SWAP3_START+findex*8);
     demappages_swap_out(p, vaddr);
     klru_free_swap(p, (char *)vaddr);
-    swap_read(p);
     return 1;
 }
 
@@ -436,7 +421,6 @@ int swap_out_heap(struct proc* p, int vaddr)
 */
 int swap_in(struct proc* p, int vaddr)
 {
-    cprintf("Swapping in for PID : %d | vaddr : %d\n", p->pid, vaddr);
     struct disk_frame* curr = p->swap_list, *prev = 0;
     int flag = 0, findex;
     if (curr == 0)
@@ -479,13 +463,11 @@ int swap_in(struct proc* p, int vaddr)
         swap_bitmap.frame_bitmap[findex] = -1;
     }
     release(&swap.lk);
-    swap_read(p);
     return mappages_swap_in(p, readswap(p, ROOTDEV, SWAP1_START + findex*8), vaddr);   
 }
 
 int swap_in_stack(struct proc* p, int vaddr)
 {
-    cprintf("Swapping in for PID : %d | vaddr : %d\n", p->pid, vaddr);
     struct disk_frame* curr = p->swap_list, *prev = 0;
     int flag = 0, findex;
     if (curr == 0)
@@ -528,13 +510,11 @@ int swap_in_stack(struct proc* p, int vaddr)
         swap_bitmap.frame_bitmap[findex] = -1;
     }
     release(&swap.lk);
-    swap_read(p);
     return mappages_swap_in(p, readswap(p, ROOTDEV, SWAP2_START + findex*8), vaddr);   
 }
 
 int swap_in_heap(struct proc* p, int vaddr)
 {
-    cprintf("Swapping in for PID : %d | vaddr : %d\n", p->pid, vaddr);
     struct disk_frame* curr = p->swap_list, *prev = 0;
     int flag = 0, findex;
     if (curr == 0)
@@ -577,7 +557,6 @@ int swap_in_heap(struct proc* p, int vaddr)
         swap_bitmap.frame_bitmap[findex] = -1;
     }
     release(&swap.lk);
-    swap_read(p);
     return mappages_swap_in(p, readswap(p, ROOTDEV, SWAP3_START + findex*8), vaddr);   
 }
 
@@ -626,7 +605,6 @@ int swap_check(struct proc* p, int vaddr)
 */
 void swap_free(int pid)
 {
-    cprintf("Freeing the SWAP list for PID : %d\n", pid);
     struct disk_frame* curr;
     int index;
     struct proc* p = get_proc(pid);
@@ -679,7 +657,6 @@ void swap_read(struct proc* p)
 
 void swap_fork(struct proc* p)
 {
-    cprintf("Chaning the Swap List due to Fork for PID %d\n", p->pid);
     struct disk_frame* curr;
     curr = p->swap_list;
     if (curr == 0){
@@ -697,7 +674,6 @@ void swap_fork(struct proc* p)
             curr->count++;
         }
     }
-    swap_read(p);
 }
 
 /*
@@ -718,7 +694,6 @@ void get_lru(int pid, int vaddr)
     struct proc* pr;
     while (lru_insert(pid, vaddr) < 0)
     {   
-        cprintf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
         if ((index = lru_delete()) < 0)
         {
             panic("LRU full as well as empty.");
@@ -733,7 +708,6 @@ void get_lru(int pid, int vaddr)
         }
         else
         {
-            cprintf("Swap Out vaddr %d from PID %d to free LRU\n", vaddr_lru, pid_lru);
             if (read_vaddr(pr, vaddr_lru) < 0){
                 continue;
             }

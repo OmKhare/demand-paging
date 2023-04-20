@@ -23,7 +23,6 @@ void pgflt_handler()
     int swapno;
     char* mem;
     uint pgflt_addr = PGROUNDDOWN(rcr2());
-    cprintf("Page Fault Occoured for Vaddr : %d for PID : %d\n", pgflt_addr, curproc->pid);
     if (pgflt_addr > KERNBASE)
     {
         panic("Over the KERNBASE!");
@@ -47,8 +46,6 @@ void pgflt_handler()
         */
         if ((swapno = swap_check(curproc, pgflt_addr)) >= 0){
             //Handle the reading from the swap and returning here.
-            cprintf("Page Present in the Swap of the Proces!\n");
-            swap_read(curproc);
             get_lru(curproc->pid, pgflt_addr);
             if (swapfunc_ptr_arr[swapno][1](curproc, pgflt_addr) < 0)
             {
@@ -60,7 +57,6 @@ void pgflt_handler()
         if ((mem = kalloc(-1, -1)) == 0){
             panic("No Free Page");
         }
-        cprintf("Handling the Page Fault Using the ELF\n");
         if (mappages(curproc->pgdir, (char*)pgflt_addr, PGSIZE, V2P(mem), PTE_W | PTE_U | PTE_P, 1) < 0)
             panic("Error in Mappages");
         if((ip = iget(curproc->ip.dev, curproc->ip.inum)) == 0)
