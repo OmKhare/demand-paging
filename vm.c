@@ -415,12 +415,13 @@ int demappages_swap_out(struct proc *p, int vaddr){
   return 0;
 }
 
-void read_vaddr(struct proc* p, int vaddr){
+int read_vaddr(struct proc* p, int vaddr){
   pte_t *pte;
   pte = walkpgdir(p->pgdir, (void *)vaddr, 0);
   if (!pte || !(*pte && PTE_P))
-    panic("copyuvm: pte should exist");
+    return -1;
   memmove(p->write_buffer, (char*)P2V(PTE_ADDR(*pte)), PGSIZE);
+  return 0;
 }
 // PAGEBREAK!
 //  Blank page.

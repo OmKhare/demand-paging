@@ -9,7 +9,7 @@ all the pages being swapped out of the system.
 
 // #define MAX_FRAME_LRU_SWAP 2560 //So total 20480 blocks in memory and 2560 pages can be present in LRU
 #define MAX_FRAME_LRU 10
-#define MAX_FRAME_SWAP 20
+#define MAX_FRAME_SWAP 25
 //2560 Number can be managed as per the actual pages present in the system.
 
 struct frame{
@@ -22,6 +22,7 @@ struct frame{
 struct disk_frame{
     int vaddr;
     int next;
+    int swap;   //saves start address of swap. if multiple disks, it can be used as device number.
     int count;
 };
 

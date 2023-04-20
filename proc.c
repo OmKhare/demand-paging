@@ -8,7 +8,7 @@
 #include "spinlock.h"
 #include "elf.h"
 
-extern int (*swapfunc_ptr_arr[])(struct proc*, int);
+extern int (*swapfunc_ptr_arr[NO_SWAP][2])(struct proc*, int);
 
 struct {
   struct spinlock lock;
@@ -177,7 +177,7 @@ growproc(int n)
     {
       memset(curproc->heap_buffer, 0 , PGSIZE);
       cprintf("Swap Out to Grow Heap of the Process with PID %d\n", curproc->pid);
-      if(swapfunc_ptr_arr[3](curproc, curproc->sz + i*PGSIZE) < 0)
+      if(swapfunc_ptr_arr[2][0](curproc, curproc->sz + i*PGSIZE) < 0)
       {
         return -1;
       }

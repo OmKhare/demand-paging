@@ -12,7 +12,7 @@
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #endif
 
-extern int (*swapfunc_ptr_arr[])(struct proc*, int);
+extern int (*swapfunc_ptr_arr[NO_SWAP][2])(struct proc*, int);
 
 void pgflt_handler()
 {
@@ -20,6 +20,7 @@ void pgflt_handler()
     struct proc *curproc = myproc();
     struct inode *ip;
     uint i;
+    int swapno;
     char* mem;
     uint pgflt_addr = PGROUNDDOWN(rcr2());
     cprintf("Page Fault Occoured for Vaddr : %d for PID : %d\n", pgflt_addr, curproc->pid);
@@ -44,12 +45,12 @@ void pgflt_handler()
 
             Stack and Heap to be thought off afterwards.
         */
-        if (swap_check(curproc, pgflt_addr) == 0){
+        if ((swapno = swap_check(curproc, pgflt_addr)) >= 0){
             //Handle the reading from the swap and returning here.
             cprintf("Page Present in the Swap of the Proces!\n");
             swap_read(curproc);
             get_lru(curproc->pid, pgflt_addr);
-            if (swapfunc_ptr_arr[0](curproc, pgflt_addr) < 0)
+            if (swapfunc_ptr_arr[swapno][1](curproc, pgflt_addr) < 0)
             {
                 panic("Swap In not working!");
             }
