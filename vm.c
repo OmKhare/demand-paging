@@ -400,38 +400,27 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
   return 0;
 }
 
-int mappages_swap_in(struct proc *p, int vaddr)
+int mappages_swap_in(struct proc* p, char *mem, int vaddr)
 {
-  char *mem;
-  if ((mem = kalloc(p->pid, -1)) == 0)
-  {
-    panic("No Free Page");
-  }
-  memmove(mem, p->read_buffer, PGSIZE);
-  if (mappages(p->pgdir, (char *)vaddr, PGSIZE, V2P(mem), PTE_W | PTE_U | PTE_P, 1) < 0)
+  if (mappages(p->pgdir, (char *)vaddr, PGSIZE, V2P(mem), PTE_W|PTE_U,  1) < 0)
     return -1;
   return 0;
 }
 
 int demappages_swap_out(struct proc *p, int vaddr){
   pte_t *pte;
-  uint pa;
   if((pte = walkpgdir(p->pgdir, (char *)vaddr, 0)) == 0)
     panic("address should exist");
-  pa = PTE_ADDR(*pte);
-  if(mappages(p->pgdir, (char *)vaddr, PGSIZE, pa, PTE_W | PTE_U, 0) < 0)
-      panic("Map pages failed");
+  *pte &= ~PTE_P;
   return 0;
 }
 
 void read_vaddr(struct proc* p, int vaddr){
   pte_t *pte;
-  int pa = 0;
   pte = walkpgdir(p->pgdir, (void *)vaddr, 0);
-  if (!pte || !(pte && PTE_P))
+  if (!pte || !(*pte && PTE_P))
     panic("copyuvm: pte should exist");
-  pa = PTE_ADDR(*pte);
-  memmove(p->write_buffer, (char*)P2V(pa), PGSIZE);
+  memmove(p->write_buffer, (char*)P2V(PTE_ADDR(*pte)), PGSIZE);
 }
 // PAGEBREAK!
 //  Blank page.

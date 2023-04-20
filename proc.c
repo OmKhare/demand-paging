@@ -175,9 +175,9 @@ growproc(int n)
     pages = (PGROUNDUP(sz) - PGROUNDUP(curproc->sz))/PGSIZE;
     for (i = 0 ; i < pages ; i++)
     {
-      memset(curproc->write_buffer, 0 , PGSIZE);
+      memset(curproc->heap_buffer, 0 , PGSIZE);
       cprintf("Swap Out to Grow Heap of the Process with PID %d\n", curproc->pid);
-      if(swapfunc_ptr_arr[1](curproc, curproc->sz + i*PGSIZE) < 0)
+      if(swapfunc_ptr_arr[3](curproc, curproc->sz + i*PGSIZE) < 0)
       {
         return -1;
       }
@@ -201,7 +201,6 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *curproc = myproc();
-  curproc->forked = 1;
 
   // Allocate process.
   if((np = allocproc()) == 0){

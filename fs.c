@@ -38,28 +38,34 @@ readsb(int dev, struct superblock *sb)
   brelse(bp);
 }
 
-void 
+char *
 readswap(struct proc *p, int dev, int bno)
 {
   int i;
   struct buf *buffer;
+  char *mem;
+  if ((mem = kalloc(p->pid, -1)) == 0)
+  {
+    panic("No Free Page");
+  }
   for (i = 0; i < 8; i++)
   {
     buffer = bread(dev, bno + i);
-    memmove(p->read_buffer + BSIZE * i, buffer->data, BSIZE);
+    memmove(mem + BSIZE * i, buffer->data, BSIZE);
     brelse(buffer);
   }
+  return mem;
 }
 
 void 
-writeswap(struct proc *p, int dev, int bno)
+writeswap(char buf[], int dev, int bno)
 {
   int i;
   struct buf *buffer;
   for (i = 0; i < 8; i++)
   {
     buffer = bget(dev, bno + i);
-    memmove(buffer->data, p->write_buffer + BSIZE * i, BSIZE);
+    memmove(buffer->data, buf + BSIZE * i, BSIZE);
     bwrite(buffer);
     brelse(buffer);
   }

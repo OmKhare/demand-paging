@@ -82,7 +82,7 @@ exec(char *path, char **argv)
     if(argc >= MAXARG)
       goto bad;
     sp = (sp - (strlen(argv[argc]) + 1)) & ~3;
-    safestrcpy(&(curproc->write_buffer[sp]), argv[argc], strlen(argv[argc]) + 1);
+    safestrcpy(&(curproc->stack_buffer[sp]), argv[argc], strlen(argv[argc]) + 1);
     ustack[3+argc] = PGROUNDUP(curproc->cdb_size) + PGSIZE + sp; 
   }
   ustack[3+argc] = 0;
@@ -92,7 +92,7 @@ exec(char *path, char **argv)
   ustack[2] =  PGROUNDUP(curproc->cdb_size) + PGSIZE + (sp - (argc+1)*4);  // argv pointer
 
   sp -= (3+argc+1) * 4;
-  memmove(curproc->write_buffer + sp, ustack, (3+argc+1)*4);
+  memmove(curproc->stack_buffer + sp, ustack, (3+argc+1)*4);
 
   //Adding Path as well as Name.
   safestrcpy(curproc->path, path, strlen(path)+1);
@@ -109,7 +109,7 @@ exec(char *path, char **argv)
   curproc->tf->esp = PGROUNDUP(curproc->cdb_size) + PGSIZE + sp;
   switchuvm(curproc);
   cprintf("Swap Out Stack PID : %d and vaddr : %d\n", curproc->pid, sz-PGSIZE);
-  if(swapfunc_ptr_arr[1](curproc, sz-PGSIZE) < 0)
+  if(swapfunc_ptr_arr[2](curproc, sz-PGSIZE) < 0)
   {
     panic("Swap Space is Full");
   }

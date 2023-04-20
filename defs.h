@@ -43,8 +43,8 @@ int             filewrite(struct file*, char*, int n);
 
 // fs.c
 void            readsb(int dev, struct superblock *sb);
-void            readswap(struct proc *, int , int);
-void            writeswap(struct proc *, int , int);
+char*            readswap(struct proc *, int , int);
+void            writeswap(char [], int , int);
 int             dirlink(struct inode*, char*, uint);
 void            getinode(struct proc* p, struct inode* ip);
 struct inode*   dirlookup(struct inode*, char*, uint*);
@@ -110,6 +110,8 @@ int             lru_get_pid_frame(int index);
 int             lru_get_vaddr_frame(int index);
 void            lru_read();
 int             swap_out(struct proc* p, int vaddr);
+int             swap_out_stack(struct proc* p, int vaddr);
+int             swap_out_heap(struct proc* p, int vaddr);
 int             swap_in(struct proc* p, int vaddr);
 int             swap_check(struct proc* p, int vaddr);
 void            swap_free(int pid);
@@ -221,7 +223,7 @@ void            read_vaddr(struct proc*, int);
 pte_t*          walkpgdir(pde_t *, const void *, int);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
-int             mappages_swap_in(struct proc* p, int vaddr);
+int             mappages_swap_in(struct proc* p, char *mem, int vaddr);
 int             demappages_swap_out(struct proc *p, int vaddr);
 
 // number of elements in fixed-size array

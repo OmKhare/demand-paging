@@ -24,7 +24,7 @@ Includes implementation of the functions to handle a doubly circular list.
     Wont need any locks.
 */
 
-int (*swapfunc_ptr_arr[])(struct proc*, int) = {swap_in, swap_out};
+int (*swapfunc_ptr_arr[])(struct proc*, int) = {swap_in, swap_out, swap_out_stack, swap_out_heap};
 
 void lru_swap_init()
 {
@@ -203,6 +203,7 @@ void lru_free(int pid) //DONE
     int flag = 0;
     struct frame *curr = lru.head;
     acquire(&lru.lk);
+    cprintf("Loop\n");
     do
     {
         flag = 0;
@@ -225,6 +226,9 @@ void lru_free(int pid) //DONE
             bitmap.frame_bitmap[index] = -1;
         }
         curr = curr->next;
+        if (curr == curr->next && curr == curr->prev){
+            break;
+        }
     } while (flag == 1 || curr != lru.head);
     release(&lru.lk);
 }
@@ -301,7 +305,7 @@ int swap_out(struct proc* p, int vaddr)
         swap.swap_frame_list[findex].vaddr = vaddr;
         swap.swap_frame_list[findex].count = 1;
         release(&swap.lk);
-        writeswap(p, ROOTDEV, SWAP_START+findex*8);
+        writeswap(p->write_buffer, ROOTDEV, SWAP_START+findex*8);
         demappages_swap_out(p, vaddr);
         klru_free_swap(p, (char *)vaddr);
         swap_read(p);
@@ -321,7 +325,7 @@ int swap_out(struct proc* p, int vaddr)
     swap.swap_frame_list[findex].vaddr = vaddr;
     swap.swap_frame_list[findex].count = 1;
     release(&swap.lk);
-    writeswap(p, ROOTDEV, SWAP_START+findex*8);
+    writeswap(p->write_buffer, ROOTDEV, SWAP_START+findex*8);
     //Updated Page Directory
     //Should Not be present here.
     demappages_swap_out(p, vaddr);
@@ -329,6 +333,99 @@ int swap_out(struct proc* p, int vaddr)
     swap_read(p);
     return 1;
 }
+
+int swap_out_stack(struct proc* p, int vaddr)
+{
+    cprintf("Swapping out for PID : %d | vaddr : %d\n", p->pid, vaddr);
+    int findex;
+    struct disk_frame* curr = p->swap_list;
+    if (p->swap_list == 0)
+    {
+        acquire(&swap.lk);
+        if ((findex = swap_get_free_frame()) < 0)
+        {
+            return -1;
+        }
+        p->swap_list = &(swap.swap_frame_list[findex]);
+        swap.swap_frame_list[findex].next = -1;
+        swap.swap_frame_list[findex].vaddr = vaddr;
+        swap.swap_frame_list[findex].count = 1;
+        release(&swap.lk);
+        writeswap(p->stack_buffer, ROOTDEV, SWAP_START+findex*8);
+        demappages_swap_out(p, vaddr);
+        klru_free_swap(p, (char *)vaddr);
+        swap_read(p);
+        return 1;
+    }
+    while (curr->next != -1)
+    {
+        curr = &(swap.swap_frame_list[curr->next]);
+    }
+    acquire(&swap.lk);
+    if ((findex = swap_get_free_frame()) < 0)
+    {
+        return -1;
+    }
+    curr->next = findex;
+    swap.swap_frame_list[findex].next = -1;
+    swap.swap_frame_list[findex].vaddr = vaddr;
+    swap.swap_frame_list[findex].count = 1;
+    release(&swap.lk);
+    writeswap(p->stack_buffer, ROOTDEV, SWAP_START+findex*8);
+    //Updated Page Directory
+    //Should Not be present here.
+    demappages_swap_out(p, vaddr);
+    klru_free_swap(p, (char *)vaddr);
+    swap_read(p);
+    return 1;
+}
+
+int swap_out_heap(struct proc* p, int vaddr)
+{
+    cprintf("Swapping out for PID : %d | vaddr : %d\n", p->pid, vaddr);
+    int findex;
+    struct disk_frame* curr = p->swap_list;
+    if (p->swap_list == 0)
+    {
+        acquire(&swap.lk);
+        if ((findex = swap_get_free_frame()) < 0)
+        {
+            return -1;
+        }
+        p->swap_list = &(swap.swap_frame_list[findex]);
+        swap.swap_frame_list[findex].next = -1;
+        swap.swap_frame_list[findex].vaddr = vaddr;
+        swap.swap_frame_list[findex].count = 1;
+        release(&swap.lk);
+        writeswap(p->heap_buffer, ROOTDEV, SWAP_START+findex*8);
+        demappages_swap_out(p, vaddr);
+        klru_free_swap(p, (char *)vaddr);
+        swap_read(p);
+        return 1;
+    }
+    while (curr->next != -1)
+    {
+        curr = &(swap.swap_frame_list[curr->next]);
+    }
+    acquire(&swap.lk);
+    if ((findex = swap_get_free_frame()) < 0)
+    {
+        return -1;
+    }
+    curr->next = findex;
+    swap.swap_frame_list[findex].next = -1;
+    swap.swap_frame_list[findex].vaddr = vaddr;
+    swap.swap_frame_list[findex].count = 1;
+    release(&swap.lk);
+    writeswap(p->heap_buffer, ROOTDEV, SWAP_START+findex*8);
+    //Updated Page Directory
+    //Should Not be present here.
+    demappages_swap_out(p, vaddr);
+    klru_free_swap(p, (char *)vaddr);
+    swap_read(p);
+    return 1;
+}
+
 
 /*
     The page read will be present in the buffer of the struct proc and then allocated.
@@ -379,9 +476,8 @@ int swap_in(struct proc* p, int vaddr)
         swap_bitmap.frame_bitmap[findex] = -1;
     }
     release(&swap.lk);
-    readswap(p, ROOTDEV, SWAP_START+findex*8);
     swap_read(p);
-    return mappages_swap_in(p, vaddr);   
+    return mappages_swap_in(p, readswap(p, ROOTDEV, SWAP_START+findex*8), vaddr);   
 }
 
 /*
@@ -429,6 +525,7 @@ int swap_check(struct proc* p, int vaddr)
 */
 void swap_free(int pid)
 {
+    cprintf("Freeing the SWAP list for PID : %d\n", pid);
     struct disk_frame* curr;
     int index;
     struct proc* p = get_proc(pid);
@@ -481,6 +578,7 @@ void swap_read(struct proc* p)
 
 void swap_fork(struct proc* p)
 {
+    cprintf("Chaning the Swap List due to Fork for PID %d\n", p->pid);
     struct disk_frame* curr;
     curr = p->swap_list;
     if (curr == 0){
@@ -498,6 +596,7 @@ void swap_fork(struct proc* p)
             curr->count++;
         }
     }
+    swap_read(p);
 }
 
 /*
@@ -516,7 +615,7 @@ void get_lru(int pid, int vaddr)
 {
     int index, vaddr_lru, pid_lru;
     struct proc* pr;
-    if (lru_insert(pid, vaddr) < 0)
+    while (lru_insert(pid, vaddr) < 0)
     {   
         cprintf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
         if ((index = lru_delete()) < 0)
@@ -530,7 +629,6 @@ void get_lru(int pid, int vaddr)
         {
             lru_free(pid_lru);
             swap_free(pid_lru);
-            lru_insert(pid, vaddr);
         }
         else
         {
@@ -540,7 +638,6 @@ void get_lru(int pid, int vaddr)
             {
                 panic("Swap Space is Full");
             }
-            lru_insert(pid, vaddr);
         }
 
     }
