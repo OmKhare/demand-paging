@@ -12,7 +12,7 @@
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       1000  // size of file system in blocks
 #define SWAP1_START   1000
-#define SWAP2_START   1100
-#define SWAP3_START   1200
-#define SWAP_SIZE    ((1*1024*1024) / 512) //Size of the SWAP after the FS (1 MB)
+#define SWAP2_START   3000
+#define SWAP3_START   3280
+#define SWAP_SIZE    ((10*1024*1024) / 512) //Size of the SWAP after the FS (5 MB)
 #define NO_SWAP      3

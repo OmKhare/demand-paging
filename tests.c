@@ -24,7 +24,7 @@
 #include "user.h"
 
 #define PAGE_SIZE 4096
-#define NUM_PAGES 11
+#define NUM_PAGES 1001
 #define NUM_ACCESSES 100
 
 int main(int argc, char *argv[]) {

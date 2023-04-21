@@ -1,12 +1,3 @@
-/*
-
-Includes implementation of the functions to handle a doubly circular list.
-
-*/
-
-//Clean LRU function to be implemented to clear the LRU pages after the process has exited.
-//Whenever doing any kalloc() -> Make a call to lru_insert. If less than zero, swap.
-
 #include "types.h"
 #include "param.h"
 #include "defs.h"
@@ -21,15 +12,10 @@ Includes implementation of the functions to handle a doubly circular list.
 #include "lru_swap.h"
 
 /*
-    Wont need any locks.
-*/
-
-/*
     Function Pointers are for each swap space -> each function for that swap.
     Keeping 3 Swap Spaces for Handling Page Faults. One swapping In/Out Heap, one for swapping In/Out Stack and one for General Swapping In/Out.
     Basically, each swap space will have its own read and write functions.
 */
-
 int (*swapfunc_ptr_arr[NO_SWAP][2])(struct proc*, int) = {{swap_out, swap_in}, {swap_out_stack, swap_in_stack}, {swap_out_heap, swap_in_heap}};
 
 void lru_swap_init()
@@ -58,7 +44,7 @@ int get_free_frame_lru()
     return -1;
 }
 
-int lru_insert(int pid, int vaddr) // DONE
+int lru_insert(int pid, int vaddr)
 {
     int index;
     if (lru.head == 0)
@@ -183,19 +169,13 @@ int lru_get_vaddr_frame(int index)
 /*
     Mandatory function after deleting a lru entry and getting the data from the lru;
 */
-
-void lru_delete_frame(int index)
+void lru_release_frame(int index)
 {
     bitmap.frame_bitmap[index] = -1;
     release(&lru.lk);
 }
 
-/*
-    Free the lru doubly linked list for a PID and set the index 
-    for it to be zero set the bit map to -1
-*/
-
-void lru_free(int pid) //DONE
+void lru_free(int pid)
 {
     if (lru.head == 0)
     {
@@ -247,27 +227,6 @@ void lru_read()
         curr = curr->next;
     }
 }
-
-
-/*
-    Functions to be written here : 
-    1. swap_out(int index)
-
-    2. swap_in(pid, vaddr)
-
-    4. swap_free() -> For a process after exec basically.
-
-    5. swap_check(pid, vaddr)
-
-    Flow of Page Faults
-
-    Page Fault -> Check Whether it is present in the Swap (swap_check) 
-        Yes -> Read 8 Frames into a page. (swap_in) (remove it from the list in proc) (set swap bitmap to -1)
-        No -> Replace the lru with the new Page (swap = swap_out + swap_in) (add it into the list of that proc) (set swap the bitstore to 1)
-    When the process exits -> 
-        call swap_free() to make all the bitmaps to zero and also the structs of swap
-
-*/
 
 int swap_get_free_frame()
 {
@@ -563,7 +522,6 @@ int swap_in_heap(struct proc* p, int vaddr)
 /*
     Check whether the page to be loaded is present in the swap.
 */
-
 int swap_check(struct proc* p, int vaddr)
 {
     struct disk_frame* df;
@@ -676,18 +634,6 @@ void swap_fork(struct proc* p)
     }
 }
 
-/*
-    void get_lru(struct proc* p, int vaddr)
-    This will make a call to insert lru.
-    If successful, return
-    If not, delete a lru, get the pid and vaddr, delete the frame
-    get the proc related to the PID.
-    If not present call the swap_free and lru_free for PID.
-    If present call the swap out function and swap out the page.
-    make the insert lru call again.
-    basically have a while loop.
-*/
-
 void get_lru(int pid, int vaddr)
 {
     int index, vaddr_lru, pid_lru;
@@ -700,7 +646,7 @@ void get_lru(int pid, int vaddr)
         }
         pid_lru = lru_get_pid_frame(index);
         vaddr_lru = lru_get_vaddr_frame(index);
-        lru_delete_frame(index);
+        lru_release_frame(index);
         if ((pr = get_proc(pid_lru)) == 0)
         {
             lru_free(pid_lru);

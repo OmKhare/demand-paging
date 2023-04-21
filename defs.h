@@ -102,7 +102,7 @@ void            end_op();
 // lru_swap.c
 void            lru_swap_init();
 int             lru_insert(int pid, int vaddr);
-void            lru_delete_frame(int index);
+void            lru_release_frame(int index);
 int             lru_delete();
 void            lru_free_frame(int pid, int vaddr);
 void            lru_free(int pid);
