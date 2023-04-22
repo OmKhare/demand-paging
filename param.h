@@ -14,5 +14,5 @@
 #define SWAP1_START   1000
 #define SWAP2_START   3000
 #define SWAP3_START   3280
-#define SWAP_SIZE    ((10*1024*1024) / 512) //Size of the SWAP after the FS (5 MB)
+#define SWAP_SIZE    ((10*1024*1024) / 512) //Size of the SWAP after the FS (10 MB)
 #define NO_SWAP      3

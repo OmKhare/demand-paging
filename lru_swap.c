@@ -607,10 +607,10 @@ void swap_read(struct proc* p)
         return;
     }
     while (df->next != -1){
-        cprintf("SWAP READ Index : %d | Vaddr : %d | count : %d | swap : %d\n", df - swap.swap_frame_list, df->vaddr, df->count, df->swap);
+        cprintf("SWAP READ PID : %d | Index : %d | Vaddr : %d | count : %d | swap : %d\n", p->pid, df - swap.swap_frame_list, df->vaddr, df->count, df->swap);
         df = &(swap.swap_frame_list[df->next]);
     }
-    cprintf("SWAP READ Index : %d | Vaddr : %d | count : %d | swap : %d\n", df - swap.swap_frame_list, df->vaddr, df->count, df->swap);
+    cprintf("SWAP READ PID : %d | Index : %d | Vaddr : %d | count : %d | swap : %d\n", p->pid, df - swap.swap_frame_list, df->vaddr, df->count, df->swap);
 }
 
 void swap_fork(struct proc* p)

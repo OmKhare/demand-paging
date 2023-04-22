@@ -89,3 +89,13 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+void
+sys_lrur(void){
+  lru_read();
+}
+
+void
+sys_swapr(void){
+  swap_read(myproc());
+}
